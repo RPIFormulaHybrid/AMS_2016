@@ -1,4 +1,4 @@
-#include <Spi.h>
+#include <SPI.h>
 #include <SoftwareSerial.h>
 
 // X-BMS Controller Software Version 1.10
@@ -14,10 +14,10 @@
 //March 5 11
 
 // BMS Settings
-#define BOTTOMSTACK   0x80 // bottom bms board address 0000
-#define TOPSTACK      0x82 // set bms to 3 daughter boards with top of stack address of 0010
-#define TOTALCELLS    32   // Set total cell number to 32
-#define TOTALBOARDS   3    // set total board number to 3
+#define BOTTOMSTACK   0x00 // bottom bms board address 0000
+#define TOPSTACK      0x00 // set bms to 3 daughter boards with top of stack address of 0010
+#define TOTALCELLS    6   // Set total cell number to 32
+#define TOTALBOARDS   1    // set total board number to 3
 #define HIGHVOLTAGECUTOFF 3.7  // Define high voltage cut off
 #define LOWVOLTAGEWARNING 2.8  // Define low voltage warning
 #define LOWVOLTAGECUTOFF 2.55   // Define low voltage cut off
@@ -32,6 +32,7 @@
 #define LCDPIN 3
 #define RESETPIN 2 
 #define HIVOLTAGESHUNT 3.5
+#define SS_PIN 10
 // Definition of all constants
 
 #define TALK digitalWrite(SS_PIN, LOW); // Chip Select
@@ -123,7 +124,9 @@ void setup()
   pinMode(CHARGERSHUTOFF, OUTPUT);
   pinMode(BATTERYSHUTOFF, OUTPUT);
   pinMode(GENERALRELAY, OUTPUT);
-  Spi.mode ((1<<SPE) | (1<<MSTR) | (1<<CPOL) | (1 << CPHA)| (1 << SPR1) | (1<<SPR0) );
+  SPI.begin();
+  SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE3));
+  //SPI.mode ((1<<SPE) | (1<<MSTR) | (1<<CPOL) | (1 << CPHA)| (1 << SPR1) | (1<<SPR0) );
   Serial.begin(9600);
   //Serial.print("\e[2J");
   zeroReference = 0;
@@ -250,7 +253,7 @@ Serial.print("lowest cell: ");
     LCD.print("E:");
     LCD.print(Wh);
     LCD.print(" ");
-    goTototal(9);
+    goTo(9);
     LCD.print(" A:");
     LCD.print(instantCurrent);
     LCD.print("  ");
@@ -318,20 +321,20 @@ Serial.print("lowest cell: ");
 void wakeUp()
 {
   TALK
-    Spi.transfer(0x01);   // Command Set
-  Spi.transfer(0xE2);   // Command Wake up
-  Spi.transfer(CFGR1);   // Command
-  Spi.transfer(CFGR2);   // Command
-  Spi.transfer(0x00);   // Command
-  Spi.transfer(0x00);   // Command
-  Spi.transfer(0x00);   // Command
+    SPI.transfer(0x01);   // Command Set
+  SPI.transfer(0xE2);   // Command Wake up
+  SPI.transfer(CFGR1);   // Command
+  SPI.transfer(CFGR2);   // Command
+  SPI.transfer(0x00);   // Command
+  SPI.transfer(0x00);   // Command
+  SPI.transfer(0x00);   // Command
   DONE
 }
 void readVolts()
 {
   // Broadcast Command, start A-D
   TALK
-    Spi.transfer(STCVAD);
+    SPI.transfer(STCVAD);
   //delay(20); // wait 20ms for all the boards to read ADC (use this delay time to read current)
   //send cell voltage to fill delay
 
@@ -357,10 +360,13 @@ void readVolts()
     //Serial.println(address, HEX);
     // Read 18 byte from 1 board and then increment address to read the next
     TALK
-      Spi.transfer(address);
-    Spi.transfer(RDCV);
+      SPI.transfer(address);
+    SPI.transfer(RDCV);
     for(int i=0; i<19; i++)
-      ltcResponse[i] = Spi.transfer(RDCV);   // send command to read voltage registers
+    {
+      ltcResponse[i] = SPI.transfer(RDCV);   // send command to read voltage registers
+      Serial.print(ltcResponse[i]);
+    }
     DONE
 
       for (int i=1; i<=12; i++)
@@ -595,14 +601,14 @@ void balanceCells()
 void writeConfig()
 {
   TALK
-    Spi.transfer(address);   // Command addresss
-  Spi.transfer(0x01);   // Commandwrite CRG
-  Spi.transfer(0x01);   // WRITE CFGR0 
-  Spi.transfer(CFGR1);   // WRITE CFGR1 
-  Spi.transfer(CFGR2);   // WRITE CFGR2
-  Spi.transfer(0x00);   // WRITE CFGR3
-  Spi.transfer(0x00);   // WRITE CFGR4
-  Spi.transfer(0x00);   // WRITE CFGR5
+    SPI.transfer(address);   // Command addresss
+  SPI.transfer(0x01);   // Commandwrite CRG
+  SPI.transfer(0x01);   // WRITE CFGR0 
+  SPI.transfer(CFGR1);   // WRITE CFGR1 
+  SPI.transfer(CFGR2);   // WRITE CFGR2
+  SPI.transfer(0x00);   // WRITE CFGR3
+  SPI.transfer(0x00);   // WRITE CFGR4
+  SPI.transfer(0x00);   // WRITE CFGR5
   DONE
 }
 
@@ -629,25 +635,25 @@ void readCurrent()
 }
 
 void selectLineOne(){  //puts the cursor at line 0 char 0.
-  LCD.print(0xFE, BYTE);   //command flag
-  LCD.print(128, BYTE);    //position
+  LCD.print(0xFE, DEC);   //command flag
+  LCD.print(128, DEC);    //position
 }
 void selectLineTwo(){  //puts the cursor at line 0 char 0.
-  LCD.print(0xFE, BYTE);   //command flag
-  LCD.print(192, BYTE);    //position
+  LCD.print(0xFE, DEC);   //command flag
+  LCD.print(192, DEC);    //position
 }
 void clearLCD(){
-  LCD.print(0xFE, BYTE);   //command flag
-  LCD.print(0x01, BYTE);   //clear command.
+  LCD.print(0xFE, DEC);   //command flag
+  LCD.print(0x01, DEC);   //clear command.
 }
 void goTo(int position) { //position = line 1: 0-15, line 2: 16-31, 31+ defaults back to 0
   if (position<16){ 
-    LCD.print(0xFE, BYTE);   //command flag
-    LCD.print((position+128), BYTE);    //position
+    LCD.print(0xFE, DEC);   //command flag
+    LCD.print((position+128), DEC);    //position
   }
   else if (position<32){
-    LCD.print(0xFE, BYTE);   //command flag
-    LCD.print((position+48+128), BYTE);    //position 
+    LCD.print(0xFE, DEC);   //command flag
+    LCD.print((position+48+128), DEC);    //position 
   } 
   else { 
     goTo(0); 
