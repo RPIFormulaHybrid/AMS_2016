@@ -11,18 +11,35 @@
 #define STOWAD 0x20 //Start Test - poll status
 #define STTMPAD 0x30// Temperature Reading - ALL
 #define address 0x80
-#define balCell1  
-#define balCell2
-#define balCell3
-#define balCell4
-#define balCell5
-#define balCell6
+#define balCell1 2
+#define balCell2 3
+#define balCell3 4
+#define balCell4 5
+#define balCell5 6
+#define balCell6 7
+#define status 8
 //Functions
 byte byteTemp;
 void setup()
 {
   pinMode(10,OUTPUT);
+  pinMode(balCell1, OUTPUT);
+  pinMode(balCell2, OUTPUT);
+  pinMode(balCell3, OUTPUT);
+  pinMode(balCell4, OUTPUT);
+  pinMode(balCell5, OUTPUT);
+  pinMode(balCell6, OUTPUT);
+  pinMode(status, OUTPUT);
+
   digitalWrite(10, HIGH);
+  digitalWrite(balCell1, LOW);
+  digitalWrite(balCell2, LOW);
+  digitalWrite(balCell3, LOW);
+  digitalWrite(balCell4, LOW);
+  digitalWrite(balCell5, LOW);
+  digitalWrite(balCell6, LOW);
+  digitalWrite(status, LOW);
+
   SPI.setBitOrder(MSBFIRST);
   SPI.setDataMode(SPI_MODE3);
   SPI.setClockDivider(SPI_CLOCK_DIV16);
@@ -33,6 +50,13 @@ void setup()
 }
 void loop()
 {
+  digitalWrite(balCell1, LOW);
+  digitalWrite(balCell2, LOW);
+  digitalWrite(balCell3, LOW);
+  digitalWrite(balCell4, LOW);
+  digitalWrite(balCell5, LOW);
+  digitalWrite(balCell6, LOW);
+
   readV();
   delay(2000);
 }
@@ -82,7 +106,7 @@ void readV()
   volt[j] = SPI.transfer(RDCV);
   }
   digitalWrite(10,HIGH);
-
+  digitalWrite(status, HIGH);
   Serial.print("Cell 1 V: ");
   Serial.println(((volt[0] & 0xFF) | (volt[1] & 0x0F) << 8)*.0015);
   Serial.print("Cell 2 V: ");
@@ -96,4 +120,5 @@ void readV()
   Serial.print("Cell 6 V: ");
   Serial.println((((volt[7] & 0xF0) >> 8 | (volt[8] & 0xFF) << 4))*.0015);
   Serial.println("--------------------");
+  digitalWrite(status, LOW);
 }
