@@ -18,10 +18,12 @@
 #define balCell5 6
 #define balCell6 7
 #define status 8
+#define ADC 9
 //Functions
 byte byteTemp;
 void setup()
 {
+  pinMode(ADC,OUTPUT);
   pinMode(10,OUTPUT);
   pinMode(balCell1, OUTPUT);
   pinMode(balCell2, OUTPUT);
@@ -32,6 +34,7 @@ void setup()
   pinMode(status, OUTPUT);
 
   digitalWrite(10, HIGH);
+  digitalWrite(ACD,HIGH);
   digitalWrite(balCell1, LOW);
   digitalWrite(balCell2, LOW);
   digitalWrite(balCell3, LOW);
@@ -108,17 +111,17 @@ void readV()
   digitalWrite(10,HIGH);
   digitalWrite(status, HIGH);
   Serial.print("Cell 1 V: ");
-  Serial.println(((volt[0] & 0xFF) | (volt[1] & 0x0F) << 8)*.0015);
+  Serial.println(((volt[0] & 0xFF) | (volt[1] & 0x0F) << 8)*.0015,3);
   Serial.print("Cell 2 V: ");
-  Serial.println(((volt[1] & 0xF0) >> 8 | (volt[2] & 0xFF) << 4 )*.0015);
+  Serial.println(((volt[1] & 0xF0) >> 8 | (volt[2] & 0xFF) << 4 )*.0015,3);
   Serial.print("Cell 3 V: ");
-  Serial.println(((volt[3] & 0xFF) | (volt[4] & 0x0F) << 8)*.0015);
+  Serial.println(((volt[3] & 0xFF) | (volt[4] & 0x0F) << 8)*.0015,3);
   Serial.print("Cell 4 V: ");
-  Serial.println(((volt[4] & 0xF0) >> 8 | (volt[5] & 0xFF) << 4 )*.0015);
+  Serial.println(((volt[4] & 0xF0) >> 8 | (volt[5] & 0xFF) << 4 )*.0015,3);
   Serial.print("Cell 5 V: ");
-  Serial.println(((volt[6] & 0xFF) | (volt[7] & 0x0F) << 8)*.0015);
+  Serial.println(((volt[6] & 0xFF) | (volt[7] & 0x0F) << 8)*.0015,3);
   Serial.print("Cell 6 V: ");
-  Serial.println((((volt[7] & 0xF0) >> 8 | (volt[8] & 0xFF) << 4))*.0015);
+  Serial.println((((volt[7] & 0xF0) >> 8 | (volt[8] & 0xFF) << 4))*.0015,3);
   Serial.println("--------------------");
   digitalWrite(status, LOW);
 }
