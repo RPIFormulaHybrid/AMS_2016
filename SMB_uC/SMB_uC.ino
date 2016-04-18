@@ -1,4 +1,6 @@
 #include <SPI.h>
+#include <Wire.h>
+
 // SDO - PIN 12
 // SDI - PIN 11
 #define WRCFG 0x01 //LTC Write Configuration Registers
@@ -34,7 +36,11 @@
 #define TEMP12 0x1B00
 
 int returnedValue = 0;
-byte byteTemp;
+byte temp[24]; //Temperature array
+char byteTemp;
+int balanceByte = 0; //Defines which cells to balance (bits 0-7 correspond to modules)
+
+boolean balanceArray[8];
 
 //Functions
 
@@ -64,21 +70,39 @@ void setup()
   SPI.setDataMode(SPI_MODE3); //Sets SPI polarity and phase
   SPI.setClockDivider(SPI_CLOCK_DIV16); //Sends and requests 2 bytes at a time
   SPI.begin(); //Initiate SPI
-  Serial.begin(9600);
-  writeReg(); //Configure registers
-  readReg(); //Print configurations FIXME: remove call after debug
+  Serial.begin(9600); //Initiate serial FIXME:Remove after debug
+  Wire.begin(1); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB
+  Wire.onReceive(receiveEvent);
+  Wire.onRequest(requestEvent);
+//  writeReg(); //Configure registers
+  //readReg(); //Print configurations FIXME: remove call after debug
 
   digitalWrite(adcCS,LOW); //Program ADC configuration
   SPI.transfer16(0x1840);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  delay(20);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  delay(20);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  delay(20);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  delay(20);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  delay(20);
   digitalWrite(adcCS,HIGH);
 
 }
 
 void loop()
 {
-  readV();
-  readT();
-  delay(100);
+  //readV();
+  //readT();
+  //(100);
 }
 
 void writeReg() //Writes configuration settings
@@ -116,7 +140,7 @@ void readV()
   SPI.transfer(STCVAD); //LTC Start all A/D's - poll status (all cells)
   delay(12); // wait at least 12ms as per data sheet, p.24 REVIEW: changed from 50 to 12ms
   digitalWrite(ltcCS,HIGH); //Exit polling
-  byte volt[18]; //Create volt array
+  char volt[18]; //Create volt array
   digitalWrite(ltcCS,LOW); //Trigger LTC chip select
   SPI.transfer(ltcAddress); //Iniitate transaction with LTC
   SPI.transfer(RDCV); //Command to read cell voltage reigster group
@@ -128,7 +152,7 @@ void readV()
   printV(volt); //FIXME: Remove after debugging
 }
 
-void printV(byte volt[18])
+void printV(char volt[18])
 {
   digitalWrite(status, HIGH); //Trigger status reading LED REVIEW: replace so status can signal an I2C transfer
   Serial.print("Cell 1 V: ");
@@ -147,57 +171,115 @@ void printV(byte volt[18])
   digitalWrite(status, LOW); //REVIEW: see above
 }
 
-void readT()
+void receiveEvent(int howMany)
 {
-  unsigned int temp[12];
-  digitalWrite(adcCS,LOW);
-  temp[0] = SPI.transfer16(TEMP1)&0xFFF);
-  digitalWrite(adcCS,HIGH);
-  digitalWrite(adcCS,LOW);
-  temp[1] = SPI.transfer16(TEMP2)&0xFFF);
-  digitalWrite(adcCS,HIGH);
-  digitalWrite(adcCS,LOW);
-  temp[2] = SPI.transfer16(TEMP3)&0xFFF);
-  digitalWrite(adcCS,HIGH);
-  digitalWrite(adcCS,LOW);
-  temp[3] = SPI.transfer16(TEMP4)&0xFFF);
-  digitalWrite(adcCS,HIGH);
-  digitalWrite(adcCS,LOW);
-  temp[4] = SPI.transfer16(TEMP5)&0xFFF);
-  digitalWrite(adcCS,HIGH);
-  digitalWrite(adcCS,LOW);
-  temp[5] = SPI.transfer16(TEMP6)&0xFFF);
-  digitalWrite(adcCS,HIGH);
-  digitalWrite(adcCS,LOW);
-  temp[6] = SPI.transfer16(TEMP7)&0xFFF);
-  digitalWrite(adcCS,HIGH);
-  digitalWrite(adcCS,LOW);
-  temp[7] = SPI.transfer16(TEMP8)&0xFFF);
-  digitalWrite(adcCS,HIGH);
-  digitalWrite(adcCS,LOW);
-  temp[8] = SPI.transfer16(TEMP9)&0xFFF);
-  digitalWrite(adcCS,HIGH);
-  digitalWrite(adcCS,LOW);
-  temp[9] = SPI.transfer16(TEMP10)&0xFFF);
-  digitalWrite(adcCS,HIGH);
-  digitalWrite(adcCS,LOW);
-  temp[10] = SPI.transfer16(TEMP11)&0xFFF);
-  digitalWrite(adcCS,HIGH);
-  digitalWrite(adcCS,LOW);
-  temp[11] = SPI.transfer16(TEMP12)&0xFFF);
-  digitalWrite(adcCS,HIGH);
+  digitalWrite(status,HIGH);
+  readT();
+  digitalWrite(status,LOW);
 
-  printMeanTemp(temp)
+  while (1 < Wire.available())
+  {
+  }
+  balanceByte = Wire.read();
+  //Serial.println(balanceByte,BIN);
+  balanceFunction();
 }
 
-void printMeanTemp (unsigned int temp[12])
-unsigned int averageTemp = 0;
+void requestEvent()
 {
+
+  while( 1 < Wire.available())
+  {
+  }
+    Wire.write(temp,24);
+    Serial.println(temp[1]);
+}
+
+void balanceFunction()
+{
+  char mask = 0x01;
+  for(int i = 0; i<8; i++)
+  {
+    balanceArray[i] = (balanceByte & mask);
+    //Serial.println(balanceByte);
+    balanceByte = balanceByte >> 1;
+  }
+}
+
+void readT()
+{
+  int tempTemp = 0;
+  digitalWrite(adcCS,LOW);
+  tempTemp = SPI.transfer16(TEMP1);
+  temp[0] = (tempTemp & 0xF00) >> 8;
+  Serial.println(temp[0],BIN);
+  temp[1] = (tempTemp & 0x0FF);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  tempTemp = SPI.transfer16(TEMP2);
+  temp[2] = (tempTemp & 0xF00) >> 8;
+  temp[3] = (tempTemp & 0x0FF);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  tempTemp = SPI.transfer16(TEMP3);
+  temp[4] = (tempTemp & 0xF00) >> 8;
+  temp[5] = (tempTemp & 0x0FF);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  tempTemp = SPI.transfer16(TEMP4);
+  temp[6] = (tempTemp & 0xF00) >> 8;
+  temp[7] = (tempTemp & 0x0FF);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  tempTemp = SPI.transfer16(TEMP5);
+  temp[8] = (tempTemp & 0xF00) >> 8;
+  temp[9] = (tempTemp & 0x0FF);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  tempTemp = SPI.transfer16(TEMP6);
+  temp[10] = (tempTemp & 0xF00) >> 8;
+  temp[11] = (tempTemp & 0x0FF);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  tempTemp = SPI.transfer16(TEMP7);
+  temp[12] = (tempTemp & 0xF00) >> 8;
+  temp[13] = (tempTemp & 0x0FF);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  tempTemp = SPI.transfer16(TEMP8);
+  temp[14] = (tempTemp & 0xF00) >> 8;
+  temp[15] = (tempTemp & 0x0FF);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  tempTemp = SPI.transfer16(TEMP9);
+  temp[16] = (tempTemp & 0xF00) >> 8;
+  temp[17] = (tempTemp & 0x0FF);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  tempTemp = SPI.transfer16(TEMP10);
+  temp[18] = (tempTemp & 0xF00) >> 8;
+  temp[19] = (tempTemp & 0x0FF);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  tempTemp = SPI.transfer16(TEMP11);
+  temp[20] = (tempTemp & 0xF00) >> 8;
+  temp[21] = (tempTemp & 0x0FF);
+  digitalWrite(adcCS,HIGH);
+  digitalWrite(adcCS,LOW);
+  tempTemp = SPI.transfer16(TEMP12);
+  temp[22] = (tempTemp & 0xF00) >> 8;
+  temp[23] = (tempTemp & 0x0FF);
+  digitalWrite(adcCS,HIGH);
+}
+
+void printMeanTemp ()
+{
+  unsigned int averageTemp = 0;
   for(int i = 0; i<11; i++)
   {
     averageTemp += temp[i];
   }
-  averageTemp = averageTemp/12'
+  averageTemp = averageTemp/12;
 
-  Serial.println(averageTemp);
+//  Serial.println(averageTemp);
 }
