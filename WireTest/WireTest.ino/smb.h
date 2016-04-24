@@ -67,7 +67,7 @@ void SMB::pollSMB()
   int i = 0;
   int j = 0;
   int k = 0;
-  char readData[12] = {0};
+  int readData[24];
 
   Wire.beginTransmission(smbAddress);
   Wire.write(balancingMask);
@@ -77,44 +77,40 @@ void SMB::pollSMB()
   Serial.print("<-WireTransmission:OtherStuff->");
   Wire.requestFrom(smbAddress, 24);
   //Serial.println(":" + String(Wire.available()) + ":");
-  while (Wire.available()) { // slave may send less than requested
-  //  int c = Wire.read(); // receive a byte as character
-  //  Serial.println(c);         // print the character
-  //Serial.println(Wire.read(),DEC);
-    if((i%2)==0)
-    {
-      j = 0;//reset variable that's being concatinated
-      i = 0;
-      k += 1;
-      int c = Wire.read();
-      j = (c&0xFF) <<8;//Read High byte in and shift it to the left then store it to variable
-      /*Serial.print(":HighByte:");
-      Serial.print(c);
-      Serial.print(":");
-      Serial.print(j,BIN);
-      Serial.print(":");*/
-    }
-    else
-    {
-      int c = Wire.read();
-      j = ((j&0xFF00) | (c & 0xFF)); //Read in low byte, mask it and append it to previous High byte
-      readData[k] = j&0xFFF;
-      /*Serial.print(":LowByte:");
-      Serial.print(c&0xFF,BIN);
-      Serial.print(":");
-      Serial.print(j&0xFFF,BIN);
-      Serial.print(":");
-      Serial.print(j&0xFFF,DEC);
-      Serial.print(": Channel ");
-      Serial.println((j&0xF000)>>12);*/
-      k += 1;
-    }
+  while (Wire.available()) 
+  { 
+    readData[i] = Wire.read()&0xFF;
     i++;
   }
-  for(int z = 0; z<sizeof(readData); z++)
-    Serial.print("," + String(readData[z]));
-  Serial.print("------------------------------\n");
+  if(readData[23] != 0)
+  {
+    for(int z = 0; z<12; z++)
+    {
+      Serial.print(",");
+      Serial.print((((readData[(z*2)]<<8)&0xFF00)|(readData[(z*2)+1]&0xFF))&0xFFF, DEC);
+      
+    }
+    Serial.println("------------------------------");
+  }
+  else if(readData[23] == 0)
+  {
+   Serial.println("");
+   Serial.print("Cell 1 V: ");
+   Serial.println(((readData[0] & 0xFF) | (readData[1] & 0x0F) << 8)* 0.0015,3);
+   Serial.print("Cell 2 V: ");
+   Serial.println(((readData[1] & 0xF0) >> 8 | (readData[2] & 0xFF) << 4 )*.0015,3);
+   Serial.print("Cell 3 V: ");
+   Serial.println(((readData[3] & 0xFF) | (readData[4] & 0x0F) << 8)*.0015,3);
+   Serial.print("Cell 4 V: ");
+   Serial.println(((readData[4] & 0xF0) >> 8 | (readData[5] & 0xFF) << 4 )*.0015,3);
+   Serial.print("Cell 5 V: ");
+   Serial.println(((readData[6] & 0xFF) | (readData[7] & 0x0F) << 8)*.0015,3);
+   Serial.print("Cell 6 V: ");
+   Serial.println((((readData[7] & 0xF0) >> 8 | (readData[8] & 0xFF) << 4))*.0015,3);
+   Serial.println("------------------------------");
+  }
 }
+
 
 int SMB::numModules()
 {
@@ -136,3 +132,4 @@ int SMB::numSensors()
 }
 
 #endif
+
