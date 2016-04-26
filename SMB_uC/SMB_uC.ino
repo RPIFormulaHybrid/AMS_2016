@@ -71,7 +71,7 @@ void setup()
 
   SPI.begin(); //Initiate SPI
   Serial.begin(9600); //Initiate serial FIXME:Remove after debug
-  Wire.begin(1); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB
+  Wire.begin(4); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB
   Wire.onReceive(receiveEvent);
   Wire.onRequest(requestEvent);
   //writeReg(); //Configure registers
