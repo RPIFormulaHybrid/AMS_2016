@@ -22,23 +22,25 @@
 #define balCell5 6
 #define balCell6 7
 #define status 8
-#define TEMP1 0x1000
-#define TEMP2 0x1080
-#define TEMP3 0x1200
-#define TEMP4 0x1300
-#define TEMP5 0x1400
-#define TEMP6 0x1500
-#define TEMP7 0x1600
-#define TEMP8 0x1700
-#define TEMP9 0x1800
-#define TEMP10 0x1900
-#define TEMP11 0x1A00
-#define TEMP12 0x1B00
+#define TEMP1 0x0000//0x1000
+#define TEMP2 0x0000//0x1080
+#define TEMP3 0x0000//0x1100
+#define TEMP4 0x0000//0x1180
+#define TEMP5 0x0000//0x1200
+#define TEMP6 0x0000//0x1280
+#define TEMP7 0x0000//0x1300
+#define TEMP8 0x0000//0x1380
+#define TEMP9 0x0000//0x1400
+#define TEMP10 0x0000//0x1480
+#define TEMP11 0x0000//0x1500
+#define TEMP12 0x0000//0x1580
 
+boolean alt = true;
 int returnedValue = 0;
 byte temp[24]; //Temperature array
+byte volt[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; //Create volt array
 char byteTemp;
-int balanceByte = 0; //Defines which cells to balance (bits 0-7 correspond to modules)
+byte balanceByte = 0; //Defines which cells to balance (bits 0-7 correspond to modules)
 
 boolean balanceArray[8];
 
@@ -58,7 +60,7 @@ void setup()
 
   digitalWrite(ltcCS, HIGH);
 
-  digitalWrite(balCell1, LOW); //Set all balancing pins low to open FETS
+  digitalWrite(balCell1, LOW); //Set all balancing pins low to open FETs
   digitalWrite(balCell2, LOW);
   digitalWrite(balCell3, LOW);
   digitalWrite(balCell4, LOW);
@@ -66,34 +68,23 @@ void setup()
   digitalWrite(balCell6, LOW);
   digitalWrite(status, LOW);
 
-  SPI.setBitOrder(MSBFIRST); //Most sig. bit first
-  SPI.setDataMode(SPI_MODE3); //Sets SPI polarity and phase
-  SPI.setClockDivider(SPI_CLOCK_DIV16); //Sends and requests 2 bytes at a time
+
   SPI.begin(); //Initiate SPI
   Serial.begin(9600); //Initiate serial FIXME:Remove after debug
-  Wire.begin(1); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB
+  Wire.begin(4); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB
   Wire.onReceive(receiveEvent);
   Wire.onRequest(requestEvent);
-//  writeReg(); //Configure registers
+  //writeReg(); //Configure registers
   //readReg(); //Print configurations FIXME: remove call after debug
 
   digitalWrite(adcCS,LOW); //Program ADC configuration
-  SPI.transfer16(0x1840);
-  digitalWrite(adcCS,HIGH);
+  SPI.transfer16(0x8000); //Enter prog mode
+  digitalWrite(adcCS, HIGH);
   digitalWrite(adcCS,LOW);
-  delay(20);
-  digitalWrite(adcCS,HIGH);
-  digitalWrite(adcCS,LOW);
-  delay(20);
-  digitalWrite(adcCS,HIGH);
-  digitalWrite(adcCS,LOW);
-  delay(20);
-  digitalWrite(adcCS,HIGH);
-  digitalWrite(adcCS,LOW);
-  delay(20);
-  digitalWrite(adcCS,HIGH);
-  digitalWrite(adcCS,LOW);
-  delay(20);
+  SPI.transfer16(0xFFF);
+  digitalWrite(adcCS, HIGH);
+  digitalWrite(adcCS, LOW);
+  SPI.transfer16(0x2840);//1840);
   digitalWrite(adcCS,HIGH);
 
 }
@@ -102,7 +93,6 @@ void loop()
 {
   //readV();
   //readT();
-  //(100);
 }
 
 void writeReg() //Writes configuration settings
@@ -136,11 +126,12 @@ void readReg()
 
 void readV()
 {
+  spiMode3(); //LTC mode
+  delay(20);
   digitalWrite(ltcCS,LOW);
   SPI.transfer(STCVAD); //LTC Start all A/D's - poll status (all cells)
   delay(12); // wait at least 12ms as per data sheet, p.24 REVIEW: changed from 50 to 12ms
   digitalWrite(ltcCS,HIGH); //Exit polling
-  char volt[18]; //Create volt array
   digitalWrite(ltcCS,LOW); //Trigger LTC chip select
   SPI.transfer(ltcAddress); //Iniitate transaction with LTC
   SPI.transfer(RDCV); //Command to read cell voltage reigster group
@@ -152,9 +143,8 @@ void readV()
   printV(volt); //FIXME: Remove after debugging
 }
 
-void printV(char volt[18])
+void printV(byte volt[18])
 {
-  digitalWrite(status, HIGH); //Trigger status reading LED REVIEW: replace so status can signal an I2C transfer
   Serial.print("Cell 1 V: ");
   Serial.println(((volt[0] & 0xFF) | (volt[1] & 0x0F) << 8)* 0.0015,3);
   Serial.print("Cell 2 V: ");
@@ -168,21 +158,21 @@ void printV(char volt[18])
   Serial.print("Cell 6 V: ");
   Serial.println((((volt[7] & 0xF0) >> 8 | (volt[8] & 0xFF) << 4))*.0015,3);
   Serial.println("--------------------");
-  digitalWrite(status, LOW); //REVIEW: see above
 }
 
 void receiveEvent(int howMany)
 {
-  digitalWrite(status,HIGH);
+  //digitalWrite(status,HIGH);
   readT();
-  digitalWrite(status,LOW);
+  readV();
+  //digitalWrite(status,LOW);
 
   while (1 < Wire.available())
   {
   }
   balanceByte = Wire.read();
   //Serial.println(balanceByte,BIN);
-  balanceFunction();
+  //balanceFunction();
 }
 
 void requestEvent()
@@ -191,8 +181,22 @@ void requestEvent()
   while( 1 < Wire.available())
   {
   }
+    digitalWrite(status, HIGH);  //Trigger status reading LED
+    for(int i = 0;i<24;i++)
+    {
+    Serial.println(temp[i]);
+    }
+    if(alt)
+    {
     Wire.write(temp,24);
-    Serial.println(temp[1]);
+    alt = false;
+  }else{
+    Wire.write(volt,24);
+    alt = true;
+  }
+
+    //Wire.write(volt,18);
+    digitalWrite(status, LOW);
 }
 
 void balanceFunction()
@@ -208,78 +212,108 @@ void balanceFunction()
 
 void readT()
 {
+  spiMode0(); //ADC mode
+
+  delay(20);
+
   int tempTemp = 0;
+
   digitalWrite(adcCS,LOW);
   tempTemp = SPI.transfer16(TEMP1);
-  temp[0] = (tempTemp & 0xF00) >> 8;
-  Serial.println(temp[0],BIN);
+  temp[0] = (tempTemp & 0xFF00) >> 8;
   temp[1] = (tempTemp & 0x0FF);
   digitalWrite(adcCS,HIGH);
   digitalWrite(adcCS,LOW);
   tempTemp = SPI.transfer16(TEMP2);
-  temp[2] = (tempTemp & 0xF00) >> 8;
+  temp[2] = (tempTemp & 0xFF00) >> 8;
   temp[3] = (tempTemp & 0x0FF);
   digitalWrite(adcCS,HIGH);
   digitalWrite(adcCS,LOW);
   tempTemp = SPI.transfer16(TEMP3);
-  temp[4] = (tempTemp & 0xF00) >> 8;
+  temp[4] = (tempTemp & 0xFF00) >> 8;
   temp[5] = (tempTemp & 0x0FF);
   digitalWrite(adcCS,HIGH);
   digitalWrite(adcCS,LOW);
   tempTemp = SPI.transfer16(TEMP4);
-  temp[6] = (tempTemp & 0xF00) >> 8;
+  temp[6] = (tempTemp & 0xFF00) >> 8;
   temp[7] = (tempTemp & 0x0FF);
   digitalWrite(adcCS,HIGH);
   digitalWrite(adcCS,LOW);
   tempTemp = SPI.transfer16(TEMP5);
-  temp[8] = (tempTemp & 0xF00) >> 8;
+  temp[8] = (tempTemp & 0xFF00) >> 8;
   temp[9] = (tempTemp & 0x0FF);
   digitalWrite(adcCS,HIGH);
   digitalWrite(adcCS,LOW);
   tempTemp = SPI.transfer16(TEMP6);
-  temp[10] = (tempTemp & 0xF00) >> 8;
+  temp[10] = (tempTemp & 0xFF00) >> 8;
   temp[11] = (tempTemp & 0x0FF);
   digitalWrite(adcCS,HIGH);
   digitalWrite(adcCS,LOW);
   tempTemp = SPI.transfer16(TEMP7);
-  temp[12] = (tempTemp & 0xF00) >> 8;
+  temp[12] = (tempTemp & 0xFF00) >> 8;
   temp[13] = (tempTemp & 0x0FF);
   digitalWrite(adcCS,HIGH);
   digitalWrite(adcCS,LOW);
   tempTemp = SPI.transfer16(TEMP8);
-  temp[14] = (tempTemp & 0xF00) >> 8;
+  temp[14] = (tempTemp & 0xFF00) >> 8;
   temp[15] = (tempTemp & 0x0FF);
   digitalWrite(adcCS,HIGH);
   digitalWrite(adcCS,LOW);
   tempTemp = SPI.transfer16(TEMP9);
-  temp[16] = (tempTemp & 0xF00) >> 8;
+  temp[16] = (tempTemp & 0xFF00) >> 8;
   temp[17] = (tempTemp & 0x0FF);
   digitalWrite(adcCS,HIGH);
   digitalWrite(adcCS,LOW);
   tempTemp = SPI.transfer16(TEMP10);
-  temp[18] = (tempTemp & 0xF00) >> 8;
+  temp[18] = (tempTemp & 0xFF00) >> 8;
   temp[19] = (tempTemp & 0x0FF);
   digitalWrite(adcCS,HIGH);
   digitalWrite(adcCS,LOW);
   tempTemp = SPI.transfer16(TEMP11);
-  temp[20] = (tempTemp & 0xF00) >> 8;
+  temp[20] = (tempTemp & 0xFF00) >> 8;
   temp[21] = (tempTemp & 0x0FF);
   digitalWrite(adcCS,HIGH);
   digitalWrite(adcCS,LOW);
   tempTemp = SPI.transfer16(TEMP12);
-  temp[22] = (tempTemp & 0xF00) >> 8;
+  temp[22] = (tempTemp & 0xFF00) >> 8;
   temp[23] = (tempTemp & 0x0FF);
   digitalWrite(adcCS,HIGH);
+
+  //printTemp();
 }
 
-void printMeanTemp ()
+void printTemp ()
 {
-  unsigned int averageTemp = 0;
-  for(int i = 0; i<11; i++)
+  int value = 1;
+  for(int i = 0; i <24; i++)
   {
-    averageTemp += temp[i];
+    Serial.print(" Temp value is: ");
+    Serial.print((((temp[i] & 0xF) << 8) | (temp[i+1])) & 0xFFF);
+    Serial.print(" From sensor: ");
+    Serial.println((temp[i] & 0xF0) >> 4);
+    value++;
+    i++;
   }
-  averageTemp = averageTemp/12;
+}
 
-//  Serial.println(averageTemp);
+void spiMode3() //LTC
+{
+  SPI.end();
+  delay(20);
+  SPI.setBitOrder(MSBFIRST); //Most sig. bit first
+  SPI.setDataMode(SPI_MODE3);
+  SPI.setClockDivider(SPI_CLOCK_DIV16); //Sends and requests 2 bytes at a time
+  SPI.begin();
+  delay(20);
+}
+
+void spiMode0() //ADC
+{
+  SPI.end();
+  delay(20);
+  SPI.setBitOrder(MSBFIRST); //Most sig. bit first
+  SPI.setDataMode(SPI_MODE0);
+  SPI.setClockDivider(SPI_CLOCK_DIV16); //Sends and requests 2 bytes at a time
+  SPI.begin();
+  delay(20);
 }
