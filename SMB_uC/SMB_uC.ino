@@ -22,6 +22,7 @@
 #define balCell5 6
 #define balCell6 7
 #define status 8
+#define WATCHDOG A0
 #define TEMP1 0x0000//0x1000
 #define TEMP2 0x0000//0x1080
 #define TEMP3 0x0000//0x1100
@@ -57,6 +58,16 @@ void setup()
   pinMode(balCell5, OUTPUT);
   pinMode(balCell6, OUTPUT);
   pinMode(status, OUTPUT);
+  pinMode(WATCHDOG,OUTPUT);
+  digitalWrite(WATCHDOG,HIGH);
+
+  for(int i = 0; i<3;i++) //Startup blink
+  {
+    digitalWrite(status,HIGH);
+    delay(50);
+    digitalWrite(status,LOW);
+    delay(50);
+  }
 
   digitalWrite(ltcCS, HIGH);
 
@@ -71,11 +82,14 @@ void setup()
 
   SPI.begin(); //Initiate SPI
   Serial.begin(9600); //Initiate serial FIXME:Remove after debug
-  Wire.begin(4); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB
+
+  Wire.begin(5); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB!!!
   Wire.onReceive(receiveEvent);
   Wire.onRequest(requestEvent);
-  //writeReg(); //Configure registers
+  writeReg(); //Configure registers
   //readReg(); //Print configurations FIXME: remove call after debug
+
+  spiMode0();
 
   digitalWrite(adcCS,LOW); //Program ADC configuration
   SPI.transfer16(0x8000); //Enter prog mode
@@ -91,13 +105,16 @@ void setup()
 
 void loop()
 {
-  //readV();
-  //readT();
+  digitalWrite(WATCHDOG,LOW);
+  digitalWrite(WATCHDOG,HIGH);
+  //readV(); //REVIEW: Remove after debug
+  //readT(); //REVIEW: Remove after debug
 }
 
 void writeReg() //Writes configuration settings
 {
-  Serial.println("Writing config..."); //FIXME: remove after debugging
+  spiMode3();
+  //Serial.println("Writing config..."); //FIXME: remove after debugging
   digitalWrite(ltcCS, LOW); //Trigger LTC chip select
   SPI.transfer(ltcAddress);
   SPI.transfer(WRCFG); //Command to write to configuration registers
