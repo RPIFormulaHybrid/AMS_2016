@@ -1,15 +1,9 @@
 //RPI FH 2016 AMS communications processor
 //KRP3.6.16
-
-/*
-
-*/
-
-
+//SKM4.28.16
 #include <SoftwareSerial.h>
 
-#define watchdogTime 20
-
+//Serial Protocol Defines
 #define TERMINATOR 0x00
 #define TESTING 0x01
 #define TEMPSENSE 0x02
@@ -33,43 +27,102 @@
 #define CHARGER2MOTHER 0x14
 #define IGNORE 0x15
 
+#define watchdogTime 20
 
-SoftwareSerial Xbee = SoftwareSerial(XbeeRx, XbeeTx);
-SoftwareSerial PLC = SoftwareSerial(PLCRx, PLCTx);
+//LED STATUS DEFINE
+#define STANDBY 1
+#define BALANCE 2
+#define RUN 3
+#define DEBUG 4
+#define STANDBYERROR 5
+#define BALANCEERROR 6
+#define RUNERROR 7
+#define EMERGENCY 8
 
+//pin defines
+#define motherRx 11
+#define motherTx 12
+#define xbeeRx 10
+#define xbeeTx 8
+#define ledRed 5
+#define ledGreen 6
+#define ledBlue 9
+#define watchdog 7
+#define shutdownPin 13
+#define startupPin A0
 
 boolean shutdown = 0;
 boolean startup = 0;
+char ledStatus = 0;
+unsigned long ledTiming = 0;
+unsigned long currentTime = 0;
 
+void setup()
+{
+  Serial.begin(9600); //PLC Serial Comms
 
+  pinMode(ledRed, OUTPUT);
+  pinMode(ledBlue, OUTPUT);
+  pinMode(ledGreen, OUTPUT);
+  pinMode(watchdog, OUTPUT);
+  pinMode(startupPin, INPUT);
+  pinMode(motherRx, INPUT);
+  pinMode(motherTx, OUTPUT);
 
-void setup(
-  Serial.begin(115200);
-  Xbee.begin(115200);
-  PLC.begin(115200);
+  digitalWrite(watchdog, HIGH);
+  digitalWrite(motherTx, LOW);
 
-  pinMode(XbeeRx, INPUT);
-  pinMode(XbeeTx, OUTPUT);
-  pinMode(PLCRx, INPUT);
-  pinMode(PLCTx, OUTPUT);
+  for(int i =0;i<3;i++)
+  {
+    digitalWrite(ledRed, HIGH);
+    digitalWrite(ledGreen, LOW);
+    digitalWrite(ledBlue, LOW);
+    delay(100);
+    digitalWrite(ledRed, LOW);
+    digitalWrite(ledGreen, HIGH);
+    digitalWrite(ledBlue, LOW);
+    delay(100);
+    digitalWrite(ledRed, LOW);
+    digitalWrite(ledGreen, LOW);
+    digitalWrite(ledBlue, HIGH);
+  }
+  digitalWrite(ledRed, HIGH);
+  digitalWrite(ledGreen, HIGH);
+  digitalWrite(ledBlue, HIGH);
+  delay(60);
+  digitalWrite(ledRed, LOW);
+  digitalWrite(ledGreen, LOW);
+  digitalWrite(ledBlue, LOW);
+  delay(50);
+  digitalWrite(ledRed, HIGH);
+  digitalWrite(ledGreen, HIGH);
+  digitalWrite(ledBlue, HIGH);
+  delay(60);
+  digitalWrite(ledRed, LOW);
+  digitalWrite(ledGreen, LOW);
+  digitalWrite(ledBlue, LOW);
 
-)
+  ledStatus = STANDBY;
+}
 
-void loop(){
+void loop()
+{
   serviceWatchdog(); //Service watchdog timer
+  currentTime = millis();
   shutdownCheck(); //Check for emergency shutdown signal
   startupCheck(); //Check for startup signal
 
-  dataRecieve(); //Read data from buffer
-  dataTransmit(); //Send out data to different devices
-
-  updateLED();
+  if(currentTime - ledTiming >=25)
+  {
+    ledTiming = currentTime;
+    updateLED();
+  }
 }
 
 void serviceWatchdog(){
-  digitalWrite(watchdog, HIGH);
+  digitalWrite(watchdog, LOW);
   delay(watchdogTime);
-  digitalWrite(watchdogPin, LOW)
+  digitalWrite(watchdog, HIGH);
 }
 
 void shutdownCheck(){
@@ -81,26 +134,69 @@ void shutdownCheck(){
 
 void startupCheck(){
   startup = digitalRead(startupPin);
-  if(startup){
-    //TODO add appropriate startup functionality
+  if(startup)
+  {
+    digitalWrite(motherTx, HIGH);
+    if(digitalRead(motherRx))
+      ledStatus = RUN;
+    else
+      ledStatus = STANDBY;
+  }
+  else
+  {
+    digitalWrite(motherTx, LOW);
+    if(digitalRead(motherRx))
+      ledStatus = RUN;
+    else
+      ledStatus = STANDBY;
   }
 }
 
-void updateLED(){
-  if(shutdown){
-    color(255,0,0);
-  }else{
-    switch(ledStatus){
+void updateLED()
+{
+  static int lastStatus = 0;
+  static int timeStep = 0;
+  static int scale = 10;
+  if(ledStatus != lastStatus)
+  {
+    timeStep = 0;
+    lastStatus = ledStatus;
+  }
+  else
+    timeStep += scale;
+  if(timeStep >= 240)
+    scale = -10;
+  else if(timeStep<=10)
+    scale = 10;
+  if(shutdown)
+  {
+    //color(255,0,0);
+  }
+  else
+  {
+    switch(ledStatus)
+    {
       case 1: //STANDBY MODE, breathing blue
         //Case 1
+        digitalWrite(ledRed, LOW);
+        digitalWrite(ledGreen, LOW);
+        analogWrite(ledBlue, timeStep);
         break;
       case 2: //BALANCE MODE, breathing yellow
         //Case 2
+        analogWrite(ledRed, timeStep);
+        analogWrite(ledGreen, timeStep);
+        digitalWrite(ledBlue, LOW);
         break;
       case 3://RUN MODE, breathing orange
-        //Case 3
+        analogWrite(ledRed, timeStep);
+        analogWrite(ledGreen, floor(timeStep/2));
+        digitalWrite(ledBlue, LOW);
         break;
       case 4: //DEBUG/TEST MODE, breathing green
+        digitalWrite(ledRed, LOW);
+        digitalWrite(ledGreen, timeStep);
+        analogWrite(ledBlue, LOW);
         //Case 4
         break;
       case 5: //Standby warning, blinking blue
@@ -112,29 +208,16 @@ void updateLED(){
       case 7: //Run warning, blinking orange
         //Case 7
         break;
-      case 8: //Emergency shutdown, blinking read
+      case 8: //Emergency shutdown, blinking red
         //Case 8
         break;
         }
   }
 }
 
-void dataRecieve(){
-  char incomingByte[64]; //Create local recieving array (no longer than serial buffer)
-  memset(incomingByte,-1,sizeof(incomingByte));
-
-  if(Serial.available() > 0)
-    { //Check to see if data is in serial buffer
-    for(int i=0; i<=Serial.available; i++)
-      { //If so, load it into local array
-      incomingByte[i] = Serial.read();
-      }
-    }
-    parsePacket(incomingByte); //Send to the data parser
-}
-
 void parsePacket(char incomingByte[64])
 {
+  int i;
   for(i = 0;i<64;i++)
   {
     if (incomingByte[i] == TERMINATOR) //If terminator, read next byte
@@ -145,16 +228,14 @@ void parsePacket(char incomingByte[64])
         // Left intentionally blank
         break;
         case TEMPSENSE:
-        tempSense();
+        //tempSense();
         break;
         case VOLTSENSE:
-        tempSense();
+        //tempSense();
         break;
         case CURRENTSENSE:
         i++; //Length byte
         i++; //Current byte
-        Xbee.print("Instantaneous current: ")
-        Xbee.println(incomingByte[i]); //Print current information
         break;
         case READYTODRIVE:
         // Should never be recieved by COMM
@@ -169,13 +250,13 @@ void parsePacket(char incomingByte[64])
         // TODO: Lower priority
         break;
         case VOLSOFTSHUT:
-        PLC.print(0x09,HEX);
+        Serial.print(0x09,HEX);
         break;
         case MANDSOFTSHUT:
-        PLC.print(0x0A,HEX)
+        Serial.print(0x0A,HEX);
         break;
         case STARTLOGAMS:
-        startLogAMS();
+        //startLogAMS();
         break;
         case STARTLOGPLC:
         // Not currently supported
@@ -191,18 +272,18 @@ void parsePacket(char incomingByte[64])
         break;
         //
         case MOTHERSTANDBY:
-        //
+          ledStatus = STANDBY;
         break;
         case MOTHERRUNNING:
-        //
+          ledStatus = RUN;
         break;
         case MOTHERCHARGING:
         //
         break;
-        case MOTHER2CHARGER;
+        case MOTHER2CHARGER:
         //
         break;
-        case CHARGER2MOTHER;
+        case CHARGER2MOTHER:
         //
         break;
         case IGNORE:

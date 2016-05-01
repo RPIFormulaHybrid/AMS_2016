@@ -9,21 +9,24 @@ class SMB
     SMB();
     SMB(int address, int numberOfModulesConnected);
     ~SMB();
-    void balance(int cells);
+    void balance(char cells);
     int currentlyBalancing(); //Returns which cells are currently being balanced
-    int* readTemps(); //Returns pointer to array of read in cell temperatures
-    int* readVoltages(); //Returns pointer to array of read cell voltages
+    float* readTemps(); //Returns pointer to array of read in cell temperatures
+    float* readVoltages(); //Returns pointer to array of read cell voltages
     float checkModule(int module); //Returns the cell voltage for a specific module
     int numModules(); //Returns the number of modules the smb is handling
     int numSensors(); //Returns the number of sensors connected to the smb
     void pollSMB();
+    void stopBalance();
   private:
-    char balancingMask = 163;
+    unsigned long currentTime = 0;
+    unsigned long previousTime = 0;
+    char balancingMask = B101010; //BalancingMask, 6 bits set which cell is balancing
     int smbAddress = 0;
     int numberOfSensors = 12;
     int numberOfModules = 0;
-    bool cellsCurrentlyBalancing[6] = {0}; //Boolean array that stores which cells on the SMB are currently balancing
-    bool cellsInNeedOfBalancing[6] = {0}; //Stores which cells still need balancing
+    char cellsCurrentlyBalancing = B0; //Boolean array that stores which cells on the SMB are currently balancing
+    char cellsInNeedOfBalancing = B0; //Stores which cells still need balancing
     float cellVoltages[6] = {0}; //Stores the last read cell voltages
     float cellTemps[12] = {0}; //Stores the last read cell temperatures
 };
@@ -41,31 +44,31 @@ SMB::SMB(int address, int numberOfModulesConnected)
 
 SMB::~SMB(){/*Nothing to destruct*/};
 
-void SMB::balance(int cells)
+void SMB::balance(char cells)
 {
-  cellsInNeedOfBalancing[cells] = 1;
+  cellsInNeedOfBalancing = cells;
 }
 
 int SMB::currentlyBalancing()
 {
   int i;
   int mask = 0;
-  for(i=0;i<numberOfModules;i++)
+/*  for(i=0;i<numberOfModules;i++)
   {
     if(cellsCurrentlyBalancing[i] == 1)
     mask = mask | (1<<i);
-  }
+  }*/
   return mask;
 }
 
-int* SMB::readTemps()
+float* SMB::readTemps()
 {
-  return 0;
+  return cellTemps;
 }
 
-int* SMB::readVoltages()
+float* SMB::readVoltages()
 {
-  return 0;
+  return cellVoltages;
 }
 
 void SMB::pollSMB()
@@ -73,7 +76,35 @@ void SMB::pollSMB()
   int i = 0;
   int j = 0;
   int k = 0;
+  char cellGroup1 = B010101;
+  char cellGroup2 = B101010;
   int readData[24];
+  currentTime = millis();
+  //Determins what balancing mask to send to smb based on cells that need balancing, changes every 30seconds until balanced
+  if(currentTime - previousTime > 30000)
+  {
+    previousTime = currentTime;
+    if(cellsInNeedOfBalancing != 0)
+    {
+      if(cellsInNeedOfBalancing & cellGroup1 != 0)
+      {
+        if((cellsInNeedOfBalancing & cellGroup2 == 0) || (cellsInNeedOfBalancing & cellGroup1 != cellsCurrentlyBalancing))
+        {
+          cellsCurrentlyBalancing = cellsInNeedOfBalancing & cellGroup1;
+          balancingMask = cellsInNeedOfBalancing & cellGroup1;
+        }
+      }
+      if(cellsInNeedOfBalancing & cellGroup2 != 0)
+      {
+        if((cellsInNeedOfBalancing & cellGroup1 == 0) || (cellsInNeedOfBalancing & cellGroup2 != cellsCurrentlyBalancing))
+        {
+          cellsCurrentlyBalancing = cellsInNeedOfBalancing & cellGroup2;
+          balancingMask = cellsInNeedOfBalancing & cellGroup2;
+        }
+      }
+    }
+  }
+
   Serial.print("I AM SMB ");
   Serial.print(smbAddress);
   Serial.println(":");
@@ -81,10 +112,10 @@ void SMB::pollSMB()
   Wire.write(balancingMask);
   int wireReturn = Wire.endTransmission();
   Serial.print(wireReturn, DEC);
-  delay(100);
+  delay(10);
   Serial.print("<-WireTransmission:OtherStuff->");
   Wire.requestFrom(smbAddress, 24);
-  //Serial.println(":" + String(Wire.available()) + ":");
+  Serial.println(":" + String(Wire.available()) + ":");
   while (Wire.available())
   {
     readData[i] = Wire.read()&0xFF;
@@ -94,8 +125,8 @@ void SMB::pollSMB()
   {
     for(int z = 0; z<12; z++)
     {
-      //Serial.print(",");
-      //Serial.print((((readData[(z*2)]<<8)&0xFF00)|(readData[(z*2)+1]&0xFF))&0xFFF, DEC);
+    /*  Serial.print(",");
+      Serial.print((((readData[(z*2)]<<8)&0xFF00)|(readData[(z*2)+1]&0xFF))&0xFFF, DEC);*/
       cellTemps[z] = (((readData[(z*2)]<<8)&0xFF00)|(readData[(z*2)+1]&0xFF))&0xFFF;
 
     }
@@ -144,6 +175,13 @@ float SMB::checkModule(int module)
 int SMB::numSensors()
 {
   return numberOfSensors;
+}
+
+void SMB::stopBalance()
+{
+  Wire.beginTransmission(smbAddress);
+  Wire.write(0);
+  int wireReturn = Wire.endTransmission();
 }
 
 #endif

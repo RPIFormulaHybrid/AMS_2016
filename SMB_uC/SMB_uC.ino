@@ -71,10 +71,10 @@ void setup()
 
   SPI.begin(); //Initiate SPI
   Serial.begin(9600); //Initiate serial FIXME:Remove after debug
-  Wire.begin(4); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB
+  Wire.begin(3); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB
   Wire.onReceive(receiveEvent);
   Wire.onRequest(requestEvent);
-  //writeReg(); //Configure registers
+  writeReg(); //Configure registers
   //readReg(); //Print configurations FIXME: remove call after debug
 
   digitalWrite(adcCS,LOW); //Program ADC configuration
@@ -91,12 +91,16 @@ void setup()
 
 void loop()
 {
-  //readV();
-  //readT();
+  readReg();
+  readV();
+  //printV(&volt[24]);
+  readT();
+  printTemp();
 }
 
 void writeReg() //Writes configuration settings
 {
+  spiMode3();
   Serial.println("Writing config..."); //FIXME: remove after debugging
   digitalWrite(ltcCS, LOW); //Trigger LTC chip select
   SPI.transfer(ltcAddress);
