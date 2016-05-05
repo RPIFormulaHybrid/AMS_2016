@@ -41,7 +41,7 @@ int returnedValue = 0;
 byte temp[24]; //Temperature array
 byte volt[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; //Create volt array
 char byteTemp;
-byte balanceByte = 0; //Defines which cells to balance (bits 0-7 correspond to modules)
+byte balanceByte = 0x00; //Defines which cells to balance (bits 0-7 correspond to modules)
 
 boolean balanceArray[8];
 
@@ -83,7 +83,7 @@ void setup()
   SPI.begin(); //Initiate SPI
   Serial.begin(9600); //Initiate serial FIXME:Remove after debug
 
-  Wire.begin(5); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB!!!
+  Wire.begin(4); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB!!!
   Wire.onReceive(receiveEvent);
   Wire.onRequest(requestEvent);
   writeReg(); //Configure registers
@@ -157,7 +157,8 @@ void readV()
     volt[j] = SPI.transfer(RDCV);
   }
   digitalWrite(ltcCS,HIGH); //Release LTC chip select
-  printV(volt); //FIXME: Remove after debugging
+  //delay(20);
+  //printV(volt); //FIXME: Remove after debugging
 }
 
 void printV(byte volt[18])
@@ -179,17 +180,15 @@ void printV(byte volt[18])
 
 void receiveEvent(int howMany)
 {
-  //digitalWrite(status,HIGH);
-  readT();
-  readV();
+
   //digitalWrite(status,LOW);
 
   while (1 < Wire.available())
   {
   }
   balanceByte = Wire.read();
-  //Serial.println(balanceByte,BIN);
-  //balanceFunction();
+  Serial.println(balanceByte,BIN);
+  balanceFunction();
 }
 
 void requestEvent()
@@ -199,10 +198,10 @@ void requestEvent()
   {
   }
     digitalWrite(status, HIGH);  //Trigger status reading LED
-    for(int i = 0;i<24;i++)
-    {
-    Serial.println(temp[i]);
-    }
+    //for(int i = 0;i<24;i++)
+    //{
+    //Serial.println(temp[i]);
+    //}
     if(alt)
     {
     Wire.write(temp,24);
@@ -212,19 +211,34 @@ void requestEvent()
     alt = true;
   }
 
-    //Wire.write(volt,18);
     digitalWrite(status, LOW);
+
+
+    balanceByte = 0x00;
+    balanceFunction(); //Turn off balancing before voltage read
+    //delay(20); //Take a moment for cell voltages to stabilize
+    //digitalWrite(status,HIGH);
+    readT();
+    readV();
 }
 
 void balanceFunction()
 {
+  Serial.println(balanceByte);
   char mask = 0x01;
-  for(int i = 0; i<8; i++)
+  for(int i = 0; i<6; i++)
   {
     balanceArray[i] = (balanceByte & mask);
-    //Serial.println(balanceByte);
+    if(balanceArray[i])
+    {
+      digitalWrite(i+2,HIGH);
+    }else{
+      digitalWrite(i+2,LOW);
+    }
     balanceByte = balanceByte >> 1;
   }
+
+
 }
 
 void readT()
