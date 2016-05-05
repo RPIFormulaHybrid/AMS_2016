@@ -22,6 +22,7 @@
 #define balCell5 6
 #define balCell6 7
 #define status 8
+#define WATCHDOG A0
 #define TEMP1 0x0000//0x1000
 #define TEMP2 0x0000//0x1080
 #define TEMP3 0x0000//0x1100
@@ -40,7 +41,7 @@ int returnedValue = 0;
 byte temp[24]; //Temperature array
 byte volt[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; //Create volt array
 char byteTemp;
-byte balanceByte = 0; //Defines which cells to balance (bits 0-7 correspond to modules)
+byte balanceByte = 0x00; //Defines which cells to balance (bits 0-7 correspond to modules)
 
 boolean balanceArray[8];
 
@@ -57,6 +58,16 @@ void setup()
   pinMode(balCell5, OUTPUT);
   pinMode(balCell6, OUTPUT);
   pinMode(status, OUTPUT);
+  pinMode(WATCHDOG,OUTPUT);
+  digitalWrite(WATCHDOG,HIGH);
+
+  for(int i = 0; i<3;i++) //Startup blink
+  {
+    digitalWrite(status,HIGH);
+    delay(50);
+    digitalWrite(status,LOW);
+    delay(50);
+  }
 
   digitalWrite(ltcCS, HIGH);
 
@@ -71,11 +82,18 @@ void setup()
 
   SPI.begin(); //Initiate SPI
   Serial.begin(9600); //Initiate serial FIXME:Remove after debug
+<<<<<<< HEAD
+
+  Wire.begin(4); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB!!!
+=======
   Wire.begin(3); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB
+>>>>>>> refs/remotes/origin/master
   Wire.onReceive(receiveEvent);
   Wire.onRequest(requestEvent);
   writeReg(); //Configure registers
   //readReg(); //Print configurations FIXME: remove call after debug
+
+  spiMode0();
 
   digitalWrite(adcCS,LOW); //Program ADC configuration
   SPI.transfer16(0x8000); //Enter prog mode
@@ -91,17 +109,28 @@ void setup()
 
 void loop()
 {
+<<<<<<< HEAD
+  digitalWrite(WATCHDOG,LOW);
+  digitalWrite(WATCHDOG,HIGH);
+  //readV(); //REVIEW: Remove after debug
+  //readT(); //REVIEW: Remove after debug
+=======
   readReg();
   readV();
   //printV(&volt[24]);
   readT();
   printTemp();
+>>>>>>> refs/remotes/origin/master
 }
 
 void writeReg() //Writes configuration settings
 {
   spiMode3();
+<<<<<<< HEAD
+  //Serial.println("Writing config..."); //FIXME: remove after debugging
+=======
   Serial.println("Writing config..."); //FIXME: remove after debugging
+>>>>>>> refs/remotes/origin/master
   digitalWrite(ltcCS, LOW); //Trigger LTC chip select
   SPI.transfer(ltcAddress);
   SPI.transfer(WRCFG); //Command to write to configuration registers
@@ -144,7 +173,8 @@ void readV()
     volt[j] = SPI.transfer(RDCV);
   }
   digitalWrite(ltcCS,HIGH); //Release LTC chip select
-  printV(volt); //FIXME: Remove after debugging
+  //delay(20);
+  //printV(volt); //FIXME: Remove after debugging
 }
 
 void printV(byte volt[18])
@@ -166,17 +196,15 @@ void printV(byte volt[18])
 
 void receiveEvent(int howMany)
 {
-  //digitalWrite(status,HIGH);
-  readT();
-  readV();
+
   //digitalWrite(status,LOW);
 
   while (1 < Wire.available())
   {
   }
   balanceByte = Wire.read();
-  //Serial.println(balanceByte,BIN);
-  //balanceFunction();
+  Serial.println(balanceByte,BIN);
+  balanceFunction();
 }
 
 void requestEvent()
@@ -186,10 +214,10 @@ void requestEvent()
   {
   }
     digitalWrite(status, HIGH);  //Trigger status reading LED
-    for(int i = 0;i<24;i++)
-    {
-    Serial.println(temp[i]);
-    }
+    //for(int i = 0;i<24;i++)
+    //{
+    //Serial.println(temp[i]);
+    //}
     if(alt)
     {
     Wire.write(temp,24);
@@ -199,19 +227,34 @@ void requestEvent()
     alt = true;
   }
 
-    //Wire.write(volt,18);
     digitalWrite(status, LOW);
+
+
+    balanceByte = 0x00;
+    balanceFunction(); //Turn off balancing before voltage read
+    //delay(20); //Take a moment for cell voltages to stabilize
+    //digitalWrite(status,HIGH);
+    readT();
+    readV();
 }
 
 void balanceFunction()
 {
+  Serial.println(balanceByte);
   char mask = 0x01;
-  for(int i = 0; i<8; i++)
+  for(int i = 0; i<6; i++)
   {
     balanceArray[i] = (balanceByte & mask);
-    //Serial.println(balanceByte);
+    if(balanceArray[i])
+    {
+      digitalWrite(i+2,HIGH);
+    }else{
+      digitalWrite(i+2,LOW);
+    }
     balanceByte = balanceByte >> 1;
   }
+
+
 }
 
 void readT()
