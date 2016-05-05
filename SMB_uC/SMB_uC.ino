@@ -82,8 +82,12 @@ void setup()
 
   SPI.begin(); //Initiate SPI
   Serial.begin(9600); //Initiate serial FIXME:Remove after debug
+<<<<<<< HEAD
 
   Wire.begin(4); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB!!!
+=======
+  Wire.begin(3); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB
+>>>>>>> refs/remotes/origin/master
   Wire.onReceive(receiveEvent);
   Wire.onRequest(requestEvent);
   writeReg(); //Configure registers
@@ -105,16 +109,28 @@ void setup()
 
 void loop()
 {
+<<<<<<< HEAD
   digitalWrite(WATCHDOG,LOW);
   digitalWrite(WATCHDOG,HIGH);
   //readV(); //REVIEW: Remove after debug
   //readT(); //REVIEW: Remove after debug
+=======
+  readReg();
+  readV();
+  //printV(&volt[24]);
+  readT();
+  printTemp();
+>>>>>>> refs/remotes/origin/master
 }
 
 void writeReg() //Writes configuration settings
 {
   spiMode3();
+<<<<<<< HEAD
   //Serial.println("Writing config..."); //FIXME: remove after debugging
+=======
+  Serial.println("Writing config..."); //FIXME: remove after debugging
+>>>>>>> refs/remotes/origin/master
   digitalWrite(ltcCS, LOW); //Trigger LTC chip select
   SPI.transfer(ltcAddress);
   SPI.transfer(WRCFG); //Command to write to configuration registers
