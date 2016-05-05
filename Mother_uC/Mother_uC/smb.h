@@ -134,7 +134,7 @@ void SMB::pollSMB()
   }
   else if(readData[23] == 0)
   {
-   /*Serial.println("");
+   Serial.println("");
    Serial.print("Cell 1 V: ");
    Serial.println(((readData[0] & 0xFF) | (readData[1] & 0x0F) << 8)* 0.0015,3);
    Serial.print("Cell 2 V: ");
@@ -147,7 +147,7 @@ void SMB::pollSMB()
    Serial.println(((readData[6] & 0xFF) | (readData[7] & 0x0F) << 8)*.0015,3);
    Serial.print("Cell 6 V: ");
    Serial.println((((readData[7] & 0xF0) >> 8 | (readData[8] & 0xFF) << 4))*.0015,3);
-   Serial.println("------------------------------");*/
+   Serial.println("------------------------------");
    cellVoltages[0] = ((readData[0] & 0xFF) | (readData[1] & 0x0F) << 8)* 0.0015;
    cellVoltages[1] = ((readData[1] & 0xF0) >> 8 | (readData[2] & 0xFF) << 4 )*.0015;
    cellVoltages[2] = ((readData[3] & 0xFF) | (readData[4] & 0x0F) << 8)*.0015;

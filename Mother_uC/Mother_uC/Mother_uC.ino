@@ -227,6 +227,7 @@ void checkCellVoltages()
     float* stringVoltages = selectedSMB.readVoltages();
     for(j = 0; j<numberOfModules; j++)
     {
+      //Serial.print(stringVoltages[j]);
       currentPackVoltage += stringVoltages[j];
       if(stringVoltages[j] > highestCellVoltage)
         highestCellVoltage = stringVoltages[j];
@@ -241,6 +242,7 @@ void checkCellVoltages()
       {
         Serial.println("CELL IS AT/BELOW MANDITORY SOFT VOLTAGE LIMIT, PLEASE SHUT DOWN SIGMA BEFORE I SHUTDOWN!!!");
         int result = discountTripleCheck(selectedSMB, j);
+
         if(result != 1)
           estop(0);
       }
@@ -252,13 +254,14 @@ void checkCellVoltages()
           estop(0);
       }
     }
+    /*
     lowestModuleVoltage = lowestCellVoltage;
     Serial.print("Lowest Cell Voltage: ");
     Serial.println(lowestCellVoltage);
     Serial.print("Highest Cell Voltage: ");
     Serial.println(highestCellVoltage);
     Serial.print("Total Pack Voltage: ");
-    Serial.println(currentPackVoltage);
+    Serial.println(currentPackVoltage);*/
   }
 }
 
