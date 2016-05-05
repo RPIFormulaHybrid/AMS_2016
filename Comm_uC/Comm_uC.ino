@@ -27,7 +27,6 @@
 #define CHARGER2MOTHER 0x14
 #define IGNORE 0x15
 
-#define watchdogTime 20
 
 //LED STATUS DEFINE
 #define STANDBY 1
@@ -119,7 +118,7 @@ void loop()
   currentTime = millis();
   statusCheck(); //Check for startup signal
 
-  if(currentTime - ledTiming >=25)
+  if((currentTime - ledTiming) >= 25)
   {
     ledTiming = currentTime;
     updateLED();
@@ -128,7 +127,6 @@ void loop()
 
 void serviceWatchdog(){
   digitalWrite(watchdog, LOW);
-  delay(watchdogTime);
   digitalWrite(watchdog, HIGH);
 }
 
