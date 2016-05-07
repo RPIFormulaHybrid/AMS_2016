@@ -42,6 +42,7 @@ byte temp[24]; //Temperature array
 byte volt[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; //Create volt array
 char byteTemp;
 byte balanceByte = 0x00; //Defines which cells to balance (bits 0-7 correspond to modules)
+byte storeByte = 0x00;
 
 boolean balanceArray[8];
 
@@ -82,16 +83,11 @@ void setup()
 
   SPI.begin(); //Initiate SPI
   Serial.begin(9600); //Initiate serial FIXME:Remove after debug
-<<<<<<< HEAD
-
-  Wire.begin(4); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB!!!
-=======
-  Wire.begin(3); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB
->>>>>>> refs/remotes/origin/master
+  Wire.begin(1); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB
   Wire.onReceive(receiveEvent);
   Wire.onRequest(requestEvent);
   writeReg(); //Configure registers
-  //readReg(); //Print configurations FIXME: remove call after debug
+  readReg(); //Print configurations FIXME: remove call after debug
 
   spiMode0();
 
@@ -109,36 +105,32 @@ void setup()
 
 void loop()
 {
-<<<<<<< HEAD
   digitalWrite(WATCHDOG,LOW);
   digitalWrite(WATCHDOG,HIGH);
   //readV(); //REVIEW: Remove after debug
   //readT(); //REVIEW: Remove after debug
-=======
-  readReg();
-  readV();
-  //printV(&volt[24]);
-  readT();
-  printTemp();
->>>>>>> refs/remotes/origin/master
+  //delay(100);
 }
 
 void writeReg() //Writes configuration settings
 {
   spiMode3();
-<<<<<<< HEAD
   //Serial.println("Writing config..."); //FIXME: remove after debugging
-=======
-  Serial.println("Writing config..."); //FIXME: remove after debugging
->>>>>>> refs/remotes/origin/master
   digitalWrite(ltcCS, LOW); //Trigger LTC chip select
   SPI.transfer(ltcAddress);
+  //delay(10);
   SPI.transfer(WRCFG); //Command to write to configuration registers
+  //delay(10);
   SPI.transfer(0x01);//0 Set comparator duty cycle to default
+  //delay(10);
   SPI.transfer(0x00);//1 Don't trigger ANY cell balancing
+  //delay(10);
   SPI.transfer(0x00);//2 Enable interrupts for cells 1-4
+  //delay(10);
   SPI.transfer(0x00);//3 Enable interrupts for cells 5-12
+  //delay(10);
   SPI.transfer(0x71);//4 2.712V low voltage reference point REVIEW: can we use these?
+  //delay(10);
   SPI.transfer(0xAB);//5 4.104V over voltage reference points REVIEW: can we use these?
   digitalWrite(ltcCS, HIGH); //End write
 }
@@ -159,6 +151,7 @@ void readReg()
 
 void readV()
 {
+  Serial.print("readingVoltage");
   spiMode3(); //LTC mode
   delay(20);
   digitalWrite(ltcCS,LOW);
@@ -171,10 +164,11 @@ void readV()
   for(int j = 0; j<18;j++) //Cycle through the 18 registers
   {
     volt[j] = SPI.transfer(RDCV);
+    //delay(150);
   }
   digitalWrite(ltcCS,HIGH); //Release LTC chip select
-  //delay(20);
-  //printV(volt); //FIXME: Remove after debugging
+  delay(60);
+  printV(volt); //FIXME: Remove after debugging
 }
 
 void printV(byte volt[18])
@@ -203,6 +197,8 @@ void receiveEvent(int howMany)
   {
   }
   balanceByte = Wire.read();
+  storeByte = balanceByte;
+  Serial.print("Recieved Balance: ");
   Serial.println(balanceByte,BIN);
   balanceFunction();
 }
@@ -229,17 +225,19 @@ void requestEvent()
 
     digitalWrite(status, LOW);
 
-
     balanceByte = 0x00;
     balanceFunction(); //Turn off balancing before voltage read
     //delay(20); //Take a moment for cell voltages to stabilize
     //digitalWrite(status,HIGH);
     readT();
     readV();
+    balanceByte = storeByte;
+    balanceFunction();
 }
 
 void balanceFunction()
 {
+  Serial.print("BalanceFunction Byte: ");
   Serial.println(balanceByte);
   char mask = 0x01;
   for(int i = 0; i<6; i++)

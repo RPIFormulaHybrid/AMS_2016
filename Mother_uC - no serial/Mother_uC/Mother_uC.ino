@@ -1,8 +1,8 @@
 #include <Wire.h>
 #include "smb.h"
-#include <SoftwareSerial.h>
+//#include <SoftwareSerial.h>
 
-//Serial Protocol Defines
+////Serial Protocol Defines
 #define TERMINATOR 0x00
 #define TESTING 0x01
 #define TEMPSENSE 0x02
@@ -33,6 +33,9 @@
 #define watchDog 7
 #define motherRx 11
 #define motherTx 12
+#define placeHolder 0
+#define balancingInducator 1
+#define fatalErrorInducator 13
 
 int state = 0;
 //State 0 = Standby
@@ -66,9 +69,9 @@ bool shutdown = 0;
 unsigned long time;
 
 const SMB smb1 = SMB(0x01,5);
-const SMB smb2 = SMB(0x02,5);
-const SMB smb4 = SMB(0x04,6);
-const SMB smb5 = SMB(0x05,6);
+const SMB smb2 = SMB(0x02,4);
+const SMB smb4 = SMB(0x04,5);
+const SMB smb5 = SMB(0x05,5);
 
 void standby(); //Contains the standby loop functions and order
 void running(); //Contains the running loop functions and order
@@ -100,16 +103,23 @@ void setup()
   pinMode(watchDog, OUTPUT);
   pinMode(motherRx, INPUT);
   pinMode(motherTx, OUTPUT);
+  pinMode(fatalErrorInducator, OUTPUT);
+  pinMode(balancingInducator, OUTPUT);
+  pinMode(placeHolder, OUTPUT);
 
   digitalWrite(motherTx, LOW);
   digitalWrite(startUp, LOW);
   digitalWrite(ohShit, HIGH);
   digitalWrite(watchDog, HIGH);
+  digitalWrite(fatalErrorInducator, LOW);
+  digitalWrite(balancingInducator, LOW);
+  digitalWrite(placeHolder, LOW);
 
   // put your setup code here, to run once:
   delay(1000);
   Serial.begin(9600);
   Wire.begin();
+
 }
 
 void loop()
@@ -122,11 +132,12 @@ void loop()
     charging();
   else
     estop(0);
+  delay(100);
 }
 
 void standby()
 {
-  Serial.println("_____I'M IN STANDBY!!!________");
+  //Serial.println("_____I'M IN STANDBY!!!________");
   toggleWatchDog();
   if(digitalRead(motherRx) && !shutdown)
   {
@@ -144,19 +155,19 @@ void standby()
   preChargeShutdown();
   checkCellVoltages();
   checkCellTemps();
-  //balance();
+  balance();
 }
 
 void running()
 {
-  Serial.println("_____I'M RUNNING!!!________");
+  //Serial.println("_____I'M RUNNING!!!________");
   toggleWatchDog();
   if(!digitalRead(motherRx))
   {
     state = 0;
     digitalWrite(motherTx, LOW);
   }
-  //stopBalance();
+  stopBalance();
   preChargeStart();
   checkCellVoltages();
   checkCellTemps();
@@ -172,7 +183,7 @@ int estop(int stopSeverity)
   if(stopSeverity == 3)
   {
     //warn driver
-    Serial.println("______WARN THE DRIVER ABOUT THING_______ -ESTOP<3");
+    //Serial.println("______WARN THE DRIVER ABOUT THING_______ -ESTOP<3");
     return 1;
   }
   else if(stopSeverity == 2)
@@ -180,7 +191,7 @@ int estop(int stopSeverity)
     //Ask plc to shutdown
     state = 0;
     shutdown = 1;
-    Serial.println("_____TELL THE PLC TO SHUTDOWN________ -ESTOP<3");
+    //Serial.println("_____TELL THE PLC TO SHUTDOWN________ -ESTOP<3");
     return 1;
   }
   else
@@ -188,7 +199,8 @@ int estop(int stopSeverity)
     state = 0;
     shutdown = 1;
     //Pull ohShit line and shutdown car
-    Serial.println("_________OH SHIT__________ -ESTOP<3");
+    //Serial.println("_________OH SHIT__________ -ESTOP<3");
+    digitalWrite(fatalErrorInducator, HIGH);
     digitalWrite(ohShit, LOW);
   }
 }
@@ -201,12 +213,12 @@ void toggleWatchDog()
 
 void preChargeStart()
 {
-  digitalWrite(startUp, LOW);
+  digitalWrite(startUp, HIGH);
 }
 
 void preChargeShutdown()
 {
-  digitalWrite(startUp, HIGH);
+  digitalWrite(startUp, LOW);
 }
 
 void checkCellVoltages()
@@ -235,7 +247,7 @@ void checkCellVoltages()
     float* stringVoltages = selectedSMB.readVoltages();
     for(j = 0; j<numberOfModules; j++)
     {
-      //Serial.print(stringVoltages[j]);
+      ////Serial.print(stringVoltages[j]);
       tempPackVoltage += stringVoltages[j];
       if(stringVoltages[j] > highestCellVoltage)
         highestCellVoltage = stringVoltages[j];
@@ -243,12 +255,12 @@ void checkCellVoltages()
         lowestCellVoltage = stringVoltages[j];
       if (stringVoltages[j]<=softMinModuleVoltage || stringVoltages[j]>=softMaxModuleVoltage)
       {
-        //Serial.println("CELL IS BELOW OR ABOVE SOFT VOLTAGE LIMIT, BE CONCERNED!!!");
+        ////Serial.println("CELL IS BELOW OR ABOVE SOFT VOLTAGE LIMIT, BE CONCERNED!!!");
         estop(3);
       }
       if (stringVoltages[j]<=softManditoryMinModuleVoltage)
       {
-        //Serial.println("CELL IS AT/BELOW MANDITORY SOFT VOLTAGE LIMIT, PLEASE SHUT DOWN SIGMA BEFORE I SHUTDOWN!!!");
+        ////Serial.println("CELL IS AT/BELOW MANDITORY SOFT VOLTAGE LIMIT, PLEASE SHUT DOWN SIGMA BEFORE I SHUTDOWN!!!");
         int result = discountTripleCheck(selectedSMB, j);
 
         if(result != 1)
@@ -256,20 +268,26 @@ void checkCellVoltages()
       }
       if (stringVoltages[j]<=minModuleVoltage || stringVoltages[j]>=maxModuleVoltage)
       {
-        //Serial.println("CELL IS BELOW OR ABOVE HARD VOLTAGE LIMIT, HALP!!!");
+        ////Serial.println("CELL IS BELOW OR ABOVE HARD VOLTAGE LIMIT, HALP!!!");
         int result = discountTripleCheck(selectedSMB, j);
         if(result != 1)
           estop(0);
       }
     }
+    if(!digitalRead(motherRx))
+    {
+      state = 0;
+      digitalWrite(motherTx, LOW);
+    }
+    delay(100);
   }
   lowestModuleVoltage = lowestCellVoltage;
-  Serial.print("Lowest Cell Voltage: ");
-  Serial.println(lowestCellVoltage);
-  Serial.print("Highest Cell Voltage: ");
-  Serial.println(highestCellVoltage);
-  Serial.print("Total Pack Voltage: ");
-  Serial.println(tempPackVoltage);
+  //Serial.print("Lowest Cell Voltage: ");
+  //Serial.println(lowestCellVoltage);
+  //Serial.print("Highest Cell Voltage: ");
+  //Serial.println(highestCellVoltage);
+  //Serial.print("Total Pack Voltage: ");
+  //Serial.println(tempPackVoltage);
   currentPackVoltage = tempPackVoltage;
 }
 
@@ -288,17 +306,18 @@ int discountTripleCheck(SMB smb, int module)
   }
   if (cellAverage<=softMinModuleVoltage || cellAverage>=softMaxModuleVoltage)
   {
-    //Serial.println("CELL IS BELOW OR ABOVE SOFT VOLTAGE LIMIT, BE CONCERNED!!!");
+    ////Serial.println("CELL IS BELOW OR ABOVE SOFT VOLTAGE LIMIT, BE CONCERNED!!!");
     return estop(3);
   }
   if (cellAverage<=softManditoryMinModuleVoltage)
   {
-    //Serial.println("CELL IS AT/BELOW MANDITORY SOFT VOLTAGE LIMIT, PLEASE SHUT DOWN SIGMA BEFORE I SHUTDOWN!!!");
+    ////Serial.println("CELL IS AT/BELOW MANDITORY SOFT VOLTAGE LIMIT, PLEASE SHUT DOWN SIGMA BEFORE I SHUTDOWN!!!");
     return estop(2);
   }
   if (cellAverage<=minModuleVoltage || cellAverage>=maxModuleVoltage)
   {
-    //Serial.println("CELL IS BELOW OR ABOVE HARD VOLTAGE LIMIT HALP!!!");
+    ////Serial.println("CELL IS BELOW OR ABOVE HARD VOLTAGE LIMIT HALP!!!");
+    digitalWrite(fatalErrorInducator, HIGH);
     return estop(0);
   }
 
@@ -339,23 +358,27 @@ void checkCellTemps()
         lowestCellTemp = stringTemps[j];
       if(stringTemps[j]<=softMinCellTemp || stringTemps[j]>=softMaxCellTemp)
       {
-        Serial.println("CELL IS BELOW OR ABOVE SOFT TEMP LIMIT, BE CONCERNED!!!");
+        //Serial.println("CELL IS BELOW OR ABOVE SOFT TEMP LIMIT, BE CONCERNED!!!");
       }
       if(stringTemps[j]>=softManditoryMaxCellTemp)
       {
-        Serial.println("CELL IS ABOVE MANDITORY SOFT TEMP LIMIT, PLEASE STOP SIGMA BEFORE I SHUTDOWN!!!");
+        //Serial.println("CELL IS ABOVE MANDITORY SOFT TEMP LIMIT, PLEASE STOP SIGMA BEFORE I SHUTDOWN!!!");
       }
       if(stringTemps[j]<=minCellTemp || stringTemps[j]>=maxCellTemp)
       {
-        Serial.println("CELL IS BELOW OR ABOVE HARD TEMP LIMIT, HALP!!!");
+        //Serial.println("CELL IS BELOW OR ABOVE HARD TEMP LIMIT, HALP!!!");
       }
     }
-    delay(100);
+    if(!digitalRead(motherRx))
+    {
+      state = 0;
+      digitalWrite(motherTx, LOW);
+    }
   }
-  Serial.print("Lowest Cell Temperature: ");
-  Serial.println(lowestCellTemp);
-  Serial.print("Highest Cell Temperature: ");
-  Serial.println(highestCellTemp);
+  //Serial.print("Lowest Cell Temperature: ");
+  //Serial.println(lowestCellTemp);
+  //Serial.print("Highest Cell Temperature: ");
+  //Serial.println(highestCellTemp);
   if(lowestCellTemp<softMinCellTemp || highestCellTemp > softMaxCellTemp)
   {
     estop(0);
@@ -367,6 +390,7 @@ void balance()
   int i;
   int j;
   SMB selectedSMB;
+  boolean needBalancing = 0;
   for(i=0; i<4; i++)
   {
     if(i == 0)
@@ -389,7 +413,10 @@ void balance()
         cellMask = cellMask | (1<<j);
     }
     selectedSMB.balance(cellMask);
+    if(cellMask>0)
+      needBalancing = 1;
   }
+  digitalWrite(balancingInducator, needBalancing);
 }
 
 void stopBalance()
