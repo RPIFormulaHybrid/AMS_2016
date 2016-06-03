@@ -3,6 +3,8 @@
 
 #include <Arduino.h> //It is very important to remember this! note that if you are using Arduino 1.0 IDE, change "WProgram.h" to "Arduino.h"
 #include <Wire.h>
+unsigned long currentTime = 0;
+unsigned long previousTime = 0;
 class SMB
 {
   public:
@@ -19,8 +21,6 @@ class SMB
     void pollSMB();
     void stopBalance();
   private:
-    unsigned long currentTime = 0;
-    unsigned long previousTime = 0;
     char balancingMask = B101010; //BalancingMask, 6 bits set which cell is balancing
     int smbAddress = 0;
     int numberOfSensors = 12;
@@ -47,6 +47,8 @@ SMB::~SMB(){/*Nothing to destruct*/};
 
 void SMB::balance(char cells)
 {
+  Serial.print("Asked To Balance: ");
+  Serial.println(cells, DEC);
   cellsInNeedOfBalancing = cells;
 }
 
@@ -84,7 +86,7 @@ void SMB::pollSMB()
   //Determins what balancing mask to send to smb based on cells that need balancing, changes every 30seconds until balanced
   if((currentTime - previousTime) > 30000)
   {
-    previousTime = millis();
+    previousTime = currentTime;
     if(cellsInNeedOfBalancing != 0)
     {
       if(cellsInNeedOfBalancing & cellGroup1 != 0)
@@ -111,6 +113,12 @@ void SMB::pollSMB()
   Serial.print("I AM SMB ");
   Serial.print(smbAddress);
   Serial.println(":");
+  Serial.print("Cells In Need Of Balancing");
+  Serial.println(cellsInNeedOfBalancing, BIN);
+  Serial.print("Current Time: ");
+  Serial.println(currentTime);
+  Serial.print("Previous Time: ");
+  Serial.println(previousTime);
   Serial.println(currentTime - previousTime);
   Wire.beginTransmission(smbAddress);
   Wire.write(balancingMask);
@@ -141,7 +149,7 @@ void SMB::pollSMB()
   }
   else if(readData[23] == 0)
   {
-   /*Serial.println("");
+   Serial.println("");
    Serial.print("Cell 1 V: ");
    Serial.println(((readData[0] & 0xFF) | (readData[1] & 0x0F) << 8)* 0.0015,3);
    Serial.print("Cell 2 V: ");
@@ -154,7 +162,7 @@ void SMB::pollSMB()
    Serial.println(((readData[6] & 0xFF) | (readData[7] & 0x0F) << 8)*.0015,3);
    Serial.print("Cell 6 V: ");
    Serial.println((((readData[7] & 0xF0) >> 8 | (readData[8] & 0xFF) << 4))*.0015,3);
-   Serial.println("------------------------------");*/
+   Serial.println("------------------------------");
    cellVoltages[0] = ((readData[0] & 0xFF) | (readData[1] & 0x0F) << 8)* 0.0015;
    cellVoltages[1] = ((readData[1] & 0xF0) >> 8 | (readData[2] & 0xFF) << 4 )*.0015;
    cellVoltages[2] = ((readData[3] & 0xFF) | (readData[4] & 0x0F) << 8)*.0015;

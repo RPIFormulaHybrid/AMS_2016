@@ -52,7 +52,7 @@ const float maxPackVoltage = 92.4;
 float softMinPackVoltage = 66.0;
 float softMaxPackVoltage = 87.0;
 float lowestModuleVoltage = 100;
-float balanceThreshold = 0.01;
+float balanceThreshold = 0.0005;
 
 //Temperatures are in celcius
 const float minCellTemp = 0;
@@ -282,12 +282,12 @@ void checkCellVoltages()
     delay(100);
   }
   lowestModuleVoltage = lowestCellVoltage;
-  //Serial.print("Lowest Cell Voltage: ");
-  //Serial.println(lowestCellVoltage);
-  //Serial.print("Highest Cell Voltage: ");
-  //Serial.println(highestCellVoltage);
-  //Serial.print("Total Pack Voltage: ");
-  //Serial.println(tempPackVoltage);
+  Serial.print("Lowest Cell Voltage: ");
+  Serial.println(lowestCellVoltage,3);
+  Serial.print("Highest Cell Voltage: ");
+  Serial.println(highestCellVoltage,3);
+  Serial.print("Total Pack Voltage: ");
+  Serial.println(tempPackVoltage,3);
   currentPackVoltage = tempPackVoltage;
 }
 
@@ -410,7 +410,10 @@ void balance()
     for(j=0;j<numberOfModules;j++)
     {
       if((stringVoltages[j] - lowestModuleVoltage) > balanceThreshold)
+      {
         cellMask = cellMask | (1<<j);
+        Serial.println(cellMask, BIN);
+      }
     }
     selectedSMB.balance(cellMask);
     if(cellMask>0)
