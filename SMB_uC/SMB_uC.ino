@@ -3,6 +3,7 @@
 
 // SDO - PIN 12
 // SDI - PIN 11
+#define BOARDID 1
 #define WRCFG 0x01 //LTC Write Configuration Registers
 #define RDCFG 0x02 //LTC Read config
 #define RDCV 0x04 // LC Read cells
@@ -83,7 +84,7 @@ void setup()
 
   SPI.begin(); //Initiate SPI
   Serial.begin(9600); //Initiate serial FIXME:Remove after debug
-  Wire.begin(1); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB
+  Wire.begin(BOARDID); //Sets address for I2C slave REVIEW: UPDATE FOR EACH SMB
   Wire.onReceive(receiveEvent);
   Wire.onRequest(requestEvent);
   writeReg(); //Configure registers
@@ -164,7 +165,7 @@ void readV()
   for(int j = 0; j<18;j++) //Cycle through the 18 registers
   {
     volt[j] = SPI.transfer(RDCV);
-    //delay(150);
+    delay(10);
   }
   digitalWrite(ltcCS,HIGH); //Release LTC chip select
   delay(60);
@@ -173,18 +174,20 @@ void readV()
 
 void printV(byte volt[18])
 {
-  Serial.print("Cell 1 V: ");
-  Serial.println(((volt[0] & 0xFF) | (volt[1] & 0x0F) << 8)* 0.0015,3);
+  Serial.println("Cell 1 V: ");
+  //Serial.println(volt[0],BIN);
+  //Serial.println(volt[1],BIN);
+  Serial.println(((volt[0] & 0xFF) | (volt[1] & 0x0F) << 8)* 0.0015,4);
   Serial.print("Cell 2 V: ");
-  Serial.println(((volt[1] & 0xF0) >> 8 | (volt[2] & 0xFF) << 4 )*.0015,3);
+  Serial.println(((volt[1] & 0xF0) >> 8 | (volt[2] & 0xFF) << 4 )*.0015,4);
   Serial.print("Cell 3 V: ");
-  Serial.println(((volt[3] & 0xFF) | (volt[4] & 0x0F) << 8)*.0015,3);
+  Serial.println(((volt[3] & 0xFF) | (volt[4] & 0x0F) << 8)*.0015,4);
   Serial.print("Cell 4 V: ");
-  Serial.println(((volt[4] & 0xF0) >> 8 | (volt[5] & 0xFF) << 4 )*.0015,3);
+  Serial.println(((volt[4] & 0xF0) >> 8 | (volt[5] & 0xFF) << 4 )*.0015,4);
   Serial.print("Cell 5 V: ");
-  Serial.println(((volt[6] & 0xFF) | (volt[7] & 0x0F) << 8)*.0015,3);
+  Serial.println(((volt[6] & 0xFF) | (volt[7] & 0x0F) << 8)*.0015,4);
   Serial.print("Cell 6 V: ");
-  Serial.println((((volt[7] & 0xF0) >> 8 | (volt[8] & 0xFF) << 4))*.0015,3);
+  Serial.println((((volt[7] & 0xF0) >> 8 | (volt[8] & 0xFF) << 4))*.0015,4);
   Serial.println("--------------------");
 }
 
@@ -239,6 +242,10 @@ void balanceFunction()
 {
   Serial.print("BalanceFunction Byte: ");
   Serial.println(balanceByte);
+  if(balanceByte>0)
+    digitalWrite(status, HIGH);
+  else
+    digitalWrite(status, LOW);
   char mask = 0x01;
   for(int i = 0; i<6; i++)
   {

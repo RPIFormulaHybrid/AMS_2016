@@ -144,7 +144,7 @@ void standby()
   preChargeShutdown();
   checkCellVoltages();
   checkCellTemps();
-  //balance();
+  balance();
 }
 
 void running()
@@ -220,14 +220,14 @@ void checkCellVoltages()
     if(i == 0)
       selectedSMB = smb1;
     else if(i == 1)
-      selectedSMB = smb2;
-      //selectedSMB = smb1;
+      //selectedSMB = smb2;
+      selectedSMB = smb1;
     else if(i == 2)
-      selectedSMB = smb4;
-      //selectedSMB = smb1;
+      //selectedSMB = smb4;
+      selectedSMB = smb1;
     else if(i == 3)
-      selectedSMB = smb5;
-      //selectedSMB = smb1;
+      //selectedSMB = smb5;
+      selectedSMB = smb1;
     int j;
     selectedSMB.pollSMB();
     selectedSMB.pollSMB();
@@ -318,14 +318,14 @@ void checkCellTemps()
     if(i == 0)
       selectedSMB = smb1;
     else if(i == 1)
-      selectedSMB = smb2;
-      //selectedSMB = smb1;
+      //selectedSMB = smb2;
+      selectedSMB = smb1;
     else if(i == 2)
-      selectedSMB = smb4;
-      //selectedSMB = smb1;
+      //selectedSMB = smb4;
+      selectedSMB = smb1;
     else if(i == 3)
-      selectedSMB = smb5;
-      //selectedSMB = smb1;
+      //selectedSMB = smb5;
+      selectedSMB = smb1;
     selectedSMB.pollSMB();
     selectedSMB.pollSMB();
     int j;
@@ -364,6 +364,7 @@ void checkCellTemps()
 
 void balance()
 {
+  Serial.print("Balance Function exe");
   int i;
   int j;
   SMB selectedSMB;
@@ -372,14 +373,14 @@ void balance()
     if(i == 0)
       selectedSMB = smb1;
     else if(i == 1)
-      selectedSMB = smb2;
-      //selectedSMB = smb1;
+      //selectedSMB = smb2;
+      selectedSMB = smb1;
     else if(i == 2)
-      selectedSMB = smb4;
-      //selectedSMB = smb1;
+      //selectedSMB = smb4;
+      selectedSMB = smb1;
     else if(i == 3)
-      selectedSMB = smb5;
-      //selectedSMB = smb1;
+      //selectedSMB = smb5;
+      selectedSMB = smb1;
     int numberOfModules = selectedSMB.numModules();
     float* stringVoltages = selectedSMB.readVoltages();
     char cellMask = B0;
@@ -389,11 +390,14 @@ void balance()
         cellMask = cellMask | (1<<j);
     }
     selectedSMB.balance(cellMask);
+    Serial.print("Cell Mask for balancing:");
+    Serial.println(cellMask,BIN);
   }
 }
 
 void stopBalance()
 {
+  Serial.print("stopBalance Function exe");
   int i;
   SMB selectedSMB;
   for(i=0; i<4; i++)
@@ -401,14 +405,14 @@ void stopBalance()
     if(i == 0)
       selectedSMB = smb1;
     else if(i == 1)
-      selectedSMB = smb2;
-      //selectedSMB = smb1;
+      //selectedSMB = smb2;
+      selectedSMB = smb1;
     else if(i == 2)
-      selectedSMB = smb4;
-      //selectedSMB = smb1;
+      //selectedSMB = smb4;
+      selectedSMB = smb1;
     else if(i == 3)
-      selectedSMB = smb5;
-      //selectedSMB = smb1;
+      //selectedSMB = smb5;
+      selectedSMB = smb1;
     selectedSMB.balance(0);
     selectedSMB.stopBalance();
   }
