@@ -39,11 +39,12 @@
 
 boolean alt = true;
 int returnedValue = 0;
-byte temp[24]; //Temperature array
+byte temp[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; //Temperature array
 byte volt[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; //Create volt array
 char byteTemp;
 byte balanceByte = 0x00; //Defines which cells to balance (bits 0-7 correspond to modules)
 byte storeByte = 0x00;
+byte readVFlag = 0;
 
 boolean balanceArray[8];
 
@@ -108,9 +109,18 @@ void loop()
 {
   digitalWrite(WATCHDOG,LOW);
   digitalWrite(WATCHDOG,HIGH);
+  if(readVFlag!=1)
+  {
+    readV();
+    //delay(300);
+    //readV();
+    readVFlag = 0;
+  }
   //readV(); //REVIEW: Remove after debug
   //readT(); //REVIEW: Remove after debug
-  //delay(100);
+  Serial.print("Cell 6 V: ");
+  Serial.println((((volt[7] & 0xF0) >> 8 | (volt[8] & 0xFF) << 4)));
+  delay(100);
 }
 
 void writeReg() //Writes configuration settings
@@ -152,12 +162,13 @@ void readReg()
 
 void readV()
 {
-  Serial.print("readingVoltage");
+  Serial.println("readingVoltage");
   spiMode3(); //LTC mode
   delay(20);
   digitalWrite(ltcCS,LOW);
   SPI.transfer(STCVAD); //LTC Start all A/D's - poll status (all cells)
-  delay(12); // wait at least 12ms as per data sheet, p.24 REVIEW: changed from 50 to 12ms
+  //delay(12); // wait at least 12ms as per data sheet, p.24 REVIEW: changed from 50 to 12ms
+  delay(50); // wait at least 12ms as per data sheet, p.24 REVIEW: changed from 50 to 12ms
   digitalWrite(ltcCS,HIGH); //Exit polling
   digitalWrite(ltcCS,LOW); //Trigger LTC chip select
   SPI.transfer(ltcAddress); //Iniitate transaction with LTC
@@ -165,29 +176,31 @@ void readV()
   for(int j = 0; j<18;j++) //Cycle through the 18 registers
   {
     volt[j] = SPI.transfer(RDCV);
+    //Serial.print("Cell 6 V: ");
+    //Serial.println((((volt[7] & 0xF0) >> 8 | (volt[8] & 0xFF) << 4)));
     delay(10);
   }
   digitalWrite(ltcCS,HIGH); //Release LTC chip select
   delay(60);
-  printV(volt); //FIXME: Remove after debugging
+  //printV(volt); //FIXME: Remove after debugging
 }
 
-void printV(byte volt[18])
+void printV(byte volt[24])
 {
-  Serial.println("Cell 1 V: ");
+  //Serial.println("Cell 1 V: ");
   //Serial.println(volt[0],BIN);
   //Serial.println(volt[1],BIN);
-  Serial.println(((volt[0] & 0xFF) | (volt[1] & 0x0F) << 8)* 0.0015,4);
-  Serial.print("Cell 2 V: ");
-  Serial.println(((volt[1] & 0xF0) >> 8 | (volt[2] & 0xFF) << 4 )*.0015,4);
+  //Serial.println(((volt[0] & 0xFF) | (volt[1] & 0x0F) << 8));
+  //Serial.print("Cell 2 V: ");
+  //Serial.println(((volt[1] & 0xF0) >> 8 | (volt[2] & 0xFF) << 4 ));
   Serial.print("Cell 3 V: ");
-  Serial.println(((volt[3] & 0xFF) | (volt[4] & 0x0F) << 8)*.0015,4);
+  Serial.println(((volt[3] & 0xFF) | (volt[4] & 0x0F) << 8));
   Serial.print("Cell 4 V: ");
-  Serial.println(((volt[4] & 0xF0) >> 8 | (volt[5] & 0xFF) << 4 )*.0015,4);
-  Serial.print("Cell 5 V: ");
-  Serial.println(((volt[6] & 0xFF) | (volt[7] & 0x0F) << 8)*.0015,4);
+  Serial.println(((volt[4] & 0xF0) >> 8 | (volt[5] & 0xFF) << 4 ));
+  //Serial.print("Cell 5 V: ");
+  //Serial.println(((volt[6] & 0xFF) | (volt[7] & 0x0F) << 8));
   Serial.print("Cell 6 V: ");
-  Serial.println((((volt[7] & 0xF0) >> 8 | (volt[8] & 0xFF) << 4))*.0015,4);
+  Serial.println((((volt[7] & 0xF0) >> 8 | (volt[8] & 0xFF) << 4)));
   Serial.println("--------------------");
 }
 
@@ -195,20 +208,31 @@ void receiveEvent(int howMany)
 {
 
   //digitalWrite(status,LOW);
-
   while (1 < Wire.available())
   {
   }
   balanceByte = Wire.read();
   storeByte = balanceByte;
-  Serial.print("Recieved Balance: ");
-  Serial.println(balanceByte,BIN);
+  Serial.println("Recieved Balance: ");
+  Serial.print(balanceByte,BIN);
   balanceFunction();
 }
 
 void requestEvent()
 {
-
+  readVFlag = 1;
+  reread:
+  if(((volt[0] & 0xFF) | (volt[1] & 0x0F) << 8)==0
+  || ((volt[1] & 0xF0) >> 8 | (volt[2] & 0xFF) << 4 ) == 0
+  || ((volt[3] & 0xFF) | (volt[4] & 0x0F) << 8) == 0
+  || ((volt[4] & 0xF0) >> 8 | (volt[5] & 0xFF) << 4 ) == 0
+  || ((volt[6] & 0xFF) | (volt[7] & 0x0F) << 8) == 0
+  || (((volt[7] & 0xF0) >> 8 | (volt[8] & 0xFF) << 4)) == 0)
+  {
+    readV();
+    Serial.println("GOTO HAPPENED!");
+    goto reread;
+  }
   while( 1 < Wire.available())
   {
   }
@@ -217,6 +241,9 @@ void requestEvent()
     //{
     //Serial.println(temp[i]);
     //}
+    //Serial.println("About to send Array");
+    //Serial.println(volt[0]);
+
     if(alt)
     {
     Wire.write(temp,24);
@@ -233,15 +260,18 @@ void requestEvent()
     //delay(20); //Take a moment for cell voltages to stabilize
     //digitalWrite(status,HIGH);
     readT();
-    readV();
+    //readV();
+    //readVFlag = 1;
     balanceByte = storeByte;
     balanceFunction();
+    printV(volt);
+    readVFlag = 0;
 }
 
 void balanceFunction()
 {
-  Serial.print("BalanceFunction Byte: ");
-  Serial.println(balanceByte);
+  Serial.println("BalanceFunction Byte: ");
+  Serial.print(balanceByte);
   if(balanceByte>0)
     digitalWrite(status, HIGH);
   else

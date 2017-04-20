@@ -39,17 +39,17 @@ int state = 0;
 //State 1 = Running Mode
 //State 2 = Charging Mode
 bool balancingFlag = 0;
-const float minModuleVoltage = 2.5;
-const float maxModuleVoltage = 4.2;
-float softMinModuleVoltage = 3.0;
-float softMaxModuleVoltage = 4.1;
-float softManditoryMinModuleVoltage = 2.6;
-const float minPackVoltage = 55.0;
-const float maxPackVoltage = 92.4;
-float softMinPackVoltage = 66.0;
-float softMaxPackVoltage = 87.0;
-float lowestModuleVoltage = 100;
-float balanceThreshold = 0.01;
+const int minModuleVoltage = 1667; //2.5 * 666.66 = 1666.65 = 1667 (round up)
+const int maxModuleVoltage = 2800; //4.2 * 666.66 = 2799.972 = 2800 (round up)
+int softMinModuleVoltage = 1867;   //2.8 * 666.66 = 1866.648 = 1867 (round up)
+int softMaxModuleVoltage = 2733;  //4.1 * 666.66 = 2733.306 = 2733 (round down)
+int softManditoryMinModuleVoltage = 1733; //2.6 * 666.66 = 1733.316 = 1733 (round down)
+const int minPackVoltage = 36666;  //55.0 * 666.66 = 36666.3 = 36666 (round down)
+const int maxPackVoltage = 61599; //92.4 * 666.66 = 61599.384 = 61599 (round down)
+int softMinPackVoltage = 44000;  //66.0 * 666.66 = 43999.56 = 44000 (round up)
+int softMaxPackVoltage = 57999;  //87.0 * 666.66 = 57999.42 = 57999 (round down)
+int lowestModuleVoltage = 66666;  //100 * 666.66 = 66666
+int balanceThreshold = 7;  //0.01 * 666.66 = 6.6666 = 7 (round up)
 
 //Temperatures are in celcius
 const float minCellTemp = 0;
@@ -69,6 +69,8 @@ const SMB smb1 = SMB(0x01,5);
 const SMB smb2 = SMB(0x02,5);
 const SMB smb4 = SMB(0x04,6);
 const SMB smb5 = SMB(0x05,6);
+
+//static int* stringVoltages;
 
 void standby(); //Contains the standby loop functions and order
 void running(); //Contains the running loop functions and order
@@ -122,6 +124,7 @@ void loop()
     charging();
   else
     estop(0);
+  delay(200);
 }
 
 void standby()
@@ -220,19 +223,30 @@ void checkCellVoltages()
     if(i == 0)
       selectedSMB = smb1;
     else if(i == 1)
-      //selectedSMB = smb2;
-      selectedSMB = smb1;
+      selectedSMB = smb2;
+      //selectedSMB = smb1;
     else if(i == 2)
-      //selectedSMB = smb4;
-      selectedSMB = smb1;
+      selectedSMB = smb4;
+      //selectedSMB = smb1;
     else if(i == 3)
-      //selectedSMB = smb5;
-      selectedSMB = smb1;
+      selectedSMB = smb5;
+      //selectedSMB = smb1;
     int j;
     selectedSMB.pollSMB();
     selectedSMB.pollSMB();
     numberOfModules = selectedSMB.numModules();
-    float* stringVoltages = selectedSMB.readVoltages();
+    int* stringVoltages = selectedSMB.readVoltages();
+    stringVoltages = selectedSMB.readVoltages();
+    Serial.println("READ OUT OF STRING VOLTAGES");
+    Serial.println("___________________________");
+    Serial.println(stringVoltages[0]);
+    Serial.println(stringVoltages[1]);
+    Serial.println(stringVoltages[2]);
+    Serial.println(stringVoltages[3]);
+    Serial.println(stringVoltages[4]);
+    Serial.println(stringVoltages[5]);
+    Serial.println("___________________________");
+
     for(j = 0; j<numberOfModules; j++)
     {
       //Serial.print(stringVoltages[j]);
@@ -275,17 +289,19 @@ void checkCellVoltages()
 
 int discountTripleCheck(SMB smb, int module)
 {
+  Serial.println("Triple Checking");
   int i;
   int j;
   float cellAverage = 0;
+  int* stringVoltages;
   for(i=0; i<3; i++)
   {
     smb.pollSMB();
     smb.pollSMB();
-    float* stringVoltages = smb.readVoltages();
-    cellAverage = (cellAverage + stringVoltages[module])/(i+1);
-
+    stringVoltages = smb.readVoltages();
+    cellAverage = cellAverage + stringVoltages[module];
   }
+  cellAverage = (cellAverage + stringVoltages[module])/3;
   if (cellAverage<=softMinModuleVoltage || cellAverage>=softMaxModuleVoltage)
   {
     //Serial.println("CELL IS BELOW OR ABOVE SOFT VOLTAGE LIMIT, BE CONCERNED!!!");
@@ -364,7 +380,7 @@ void checkCellTemps()
 
 void balance()
 {
-  Serial.print("Balance Function exe");
+  Serial.println("Balance Function exe");
   int i;
   int j;
   SMB selectedSMB;
@@ -382,10 +398,22 @@ void balance()
       //selectedSMB = smb5;
       selectedSMB = smb1;
     int numberOfModules = selectedSMB.numModules();
-    float* stringVoltages = selectedSMB.readVoltages();
+    selectedSMB.pollSMB();
+    selectedSMB.pollSMB();
+    int* stringVoltages = selectedSMB.readVoltages();
+    stringVoltages = selectedSMB.readVoltages();
+    int* testStuff = selectedSMB.readVoltagesTest();
+    Serial.println("Test Passing of Stuff");
+    Serial.println(testStuff[0]);
+    Serial.println("String Voltages test stuff");
+    Serial.println(stringVoltages[0]);
     char cellMask = B0;
     for(j=0;j<numberOfModules;j++)
     {
+      Serial.println(lowestModuleVoltage);
+      Serial.println(stringVoltages[j]);
+      Serial.println(stringVoltages[j] - lowestModuleVoltage);
+
       if((stringVoltages[j] - lowestModuleVoltage) > balanceThreshold)
         cellMask = cellMask | (1<<j);
     }

@@ -12,7 +12,8 @@ class SMB
     void balance(char cells);
     int currentlyBalancing(); //Returns which cells are currently being balanced
     float* readTemps(); //Returns pointer to array of read in cell temperatures
-    float* readVoltages(); //Returns pointer to array of read cell voltages
+    int* readVoltages(); //Returns pointer to array of read cell voltages
+    int* readVoltagesTest();
     float checkModule(int module); //Returns the cell voltage for a specific module
     int numModules(); //Returns the number of modules the smb is handling
     int numSensors(); //Returns the number of sensors connected to the smb
@@ -27,13 +28,14 @@ class SMB
     int numberOfModules = 0;
     char cellsCurrentlyBalancing = B0; //Boolean array that stores which cells on the SMB are currently balancing
     char cellsInNeedOfBalancing = B0; //Stores which cells still need balancing
-    float cellVoltages[6] = {0}; //Stores the last read cell voltages
+    int cellVoltages[6] = {0}; //Stores the last read cell voltages
     float cellTemps[12] = {0}; //Stores the last read cell temperatures
+    int cellVoltagesTest[1] = {3};
+
 };
 
 SMB::SMB()
 {
-
 }
 
 SMB::SMB(int address, int numberOfModulesConnected)
@@ -66,7 +68,12 @@ float* SMB::readTemps()
   return cellTemps;
 }
 
-float* SMB::readVoltages()
+int* SMB::readVoltagesTest()
+{
+  return cellVoltagesTest;
+}
+
+int* SMB::readVoltages()
 {
   return cellVoltages;
 }
@@ -122,7 +129,11 @@ void SMB::pollSMB()
   Serial.println(":" + String(Wire.available()) + ":");
   while (Wire.available())
   {
+    //Serial.println("Recieving I2C Data");
     readData[i] = Wire.read()&0xFF;
+    //Serial.print("Cell 6 V: ");
+    //Serial.println((((readData[7] & 0xF0) >> 8 | (readData[8] & 0xFF) << 4)));
+    //Serial.println("------------------------------");
     i++;
   }
   if(readData[23] != 0)
@@ -141,26 +152,29 @@ void SMB::pollSMB()
   }
   else if(readData[23] == 0)
   {
+  /*
    Serial.println("");
    Serial.print("Cell 1 V: ");
-   Serial.println(((readData[0] & 0xFF) | (readData[1] & 0x0F) << 8)* 0.0015,4);
+   Serial.println(((readData[0] & 0xFF) | (readData[1] & 0x0F) << 8));
    Serial.print("Cell 2 V: ");
-   Serial.println(((readData[1] & 0xF0) >> 8 | (readData[2] & 0xFF) << 4 )*.0015,4);
+   Serial.println(((readData[1] & 0xF0) >> 8 | (readData[2] & 0xFF) << 4 ));
    Serial.print("Cell 3 V: ");
-   Serial.println(((readData[3] & 0xFF) | (readData[4] & 0x0F) << 8)*.0015,4);
+   Serial.println(((readData[3] & 0xFF) | (readData[4] & 0x0F) << 8));
    Serial.print("Cell 4 V: ");
-   Serial.println(((readData[4] & 0xF0) >> 8 | (readData[5] & 0xFF) << 4 )*.0015,4);
+   Serial.println(((readData[4] & 0xF0) >> 8 | (readData[5] & 0xFF) << 4 ));
    Serial.print("Cell 5 V: ");
-   Serial.println(((readData[6] & 0xFF) | (readData[7] & 0x0F) << 8)*.0015,4);
+   Serial.println(((readData[6] & 0xFF) | (readData[7] & 0x0F) << 8));
    Serial.print("Cell 6 V: ");
-   Serial.println((((readData[7] & 0xF0) >> 8 | (readData[8] & 0xFF) << 4))*.0015,4);
-   Serial.println("------------------------------");
-   cellVoltages[0] = ((readData[0] & 0xFF) | (readData[1] & 0x0F) << 8)* 0.0015;
-   cellVoltages[1] = ((readData[1] & 0xF0) >> 8 | (readData[2] & 0xFF) << 4 )*.0015;
-   cellVoltages[2] = ((readData[3] & 0xFF) | (readData[4] & 0x0F) << 8)*.0015;
-   cellVoltages[3] = ((readData[4] & 0xF0) >> 8 | (readData[5] & 0xFF) << 4 )*.0015;
-   cellVoltages[4] = ((readData[6] & 0xFF) | (readData[7] & 0x0F) << 8)*.0015;
-   cellVoltages[5] = (((readData[7] & 0xF0) >> 8 | (readData[8] & 0xFF) << 4))*.0015;
+   Serial.println((((readData[7] & 0xF0) >> 8 | (readData[8] & 0xFF) << 4)));
+   Serial.println("------------------------------");*/
+   cellVoltages[0] = ((readData[0] & 0xFF) | (readData[1] & 0x0F) << 8);
+   cellVoltages[1] = ((readData[1] & 0xF0) >> 8 | (readData[2] & 0xFF) << 4 );
+   cellVoltages[2] = ((readData[3] & 0xFF) | (readData[4] & 0x0F) << 8);
+   cellVoltages[3] = ((readData[4] & 0xF0) >> 8 | (readData[5] & 0xFF) << 4 );
+   cellVoltages[4] = ((readData[6] & 0xFF) | (readData[7] & 0x0F) << 8);
+   cellVoltages[5] = (((readData[7] & 0xF0) >> 8 | (readData[8] & 0xFF) << 4));
+   //Serial.println("CellVoltages[5]");
+   //Serial.println(cellVoltages[5]);
   }
 }
 
