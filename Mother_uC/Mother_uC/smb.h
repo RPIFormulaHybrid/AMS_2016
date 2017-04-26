@@ -20,16 +20,17 @@ class SMB
     void pollSMB();
     void stopBalance();
   private:
-    unsigned long currentTime = 0;
-    unsigned long previousTime = 0;
-    char balancingMask = B0; //BalancingMask, 6 bits set which cell is balancing
+    static unsigned long currentTime;
+    static unsigned long previousTime;
+    static char balancingMask; //BalancingMask, 6 bits set which cell is balancing
     int smbAddress = 0;
     int numberOfSensors = 12;
     int numberOfModules = 0;
-    char cellsCurrentlyBalancing = B0; //Boolean array that stores which cells on the SMB are currently balancing
-    char cellsInNeedOfBalancing = B0; //Stores which cells still need balancing
-    int cellVoltages[6] = {0}; //Stores the last read cell voltages
-    float cellTemps[12] = {0}; //Stores the last read cell temperatures
+    //static char cellsInNeedOfBalancing = B0; //Stores which cells still need balancing
+    static char cellsInNeedOfBalancing;
+    static char cellsCurrentlyBalancing; //Boolean array that stores which cells on the SMB are currently balancing
+    static int cellVoltages[6]; //Stores the last read cell voltages
+    static float cellTemps[12]; //Stores the last read cell temperatures
     int cellVoltagesTest[1] = {3};
 
 };
@@ -48,6 +49,8 @@ SMB::~SMB(){/*Nothing to destruct*/};
 
 void SMB::balance(char cells)
 {
+  //Serial.print("SMB " + String(smbAddress) + "Reporting, recieved command to balance following cells: ");
+  //Serial.println(cells,BIN);
   cellsInNeedOfBalancing = cells;
 }
 
@@ -87,31 +90,49 @@ void SMB::pollSMB()
   char cellGroup2 = B101010;
   int readData[24];
   currentTime = millis();
+  Serial.print("SMB " + String(smbAddress) + "Reporting, cells in need of balance: ");
+  Serial.println(this->cellsInNeedOfBalancing, BIN);
+  Serial.println(this->cellsCurrentlyBalancing, BIN);
+  Serial.println(this->balancingMask, BIN);
+  Serial.println("CurrentTime, PreviousTime");
+  Serial.println(currentTime);
+  Serial.println(previousTime);
   //Determins what balancing mask to send to smb based on cells that need balancing, changes every 30seconds until balanced
   if(currentTime - previousTime > 30000)
   {
     previousTime = currentTime;
-    if(cellsInNeedOfBalancing != 0)
+    Serial.println("Time Updated");
+    Serial.println(int(this->cellsInNeedOfBalancing));
+    if(int(this->cellsInNeedOfBalancing) > 0)
     {
-      if(cellsInNeedOfBalancing & cellGroup1 != 0)
+      Serial.println("There are cells in need of balancing");
+
+      if((this->cellsInNeedOfBalancing & cellGroup1) != 0)
       {
-        if((cellsInNeedOfBalancing & cellGroup2 == 0) || (cellsInNeedOfBalancing & cellGroup1 != cellsCurrentlyBalancing))
+        if(((this->cellsInNeedOfBalancing & cellGroup2) == 0) || ((this->cellsInNeedOfBalancing & cellGroup1) != cellsCurrentlyBalancing))
         {
-          cellsCurrentlyBalancing = cellsInNeedOfBalancing & cellGroup1;
-          balancingMask = cellsInNeedOfBalancing & cellGroup1;
+          Serial.println("Balancing Group 1");
+          this->cellsCurrentlyBalancing = (this->cellsInNeedOfBalancing & cellGroup1);
+          balancingMask = (this->cellsInNeedOfBalancing & cellGroup1);
+          goto skipPastGroup2Check;
         }
       }
-      if(cellsInNeedOfBalancing & cellGroup2 != 0)
+
+      if((this->cellsInNeedOfBalancing & cellGroup2) != 0)
       {
-        if((cellsInNeedOfBalancing & cellGroup1 == 0) || (cellsInNeedOfBalancing & cellGroup2 != cellsCurrentlyBalancing))
+        if(((this->cellsInNeedOfBalancing & cellGroup1) == 0) || ((this->cellsInNeedOfBalancing & cellGroup2) != cellsCurrentlyBalancing))
         {
-          cellsCurrentlyBalancing = cellsInNeedOfBalancing & cellGroup2;
-          balancingMask = cellsInNeedOfBalancing & cellGroup2;
+          Serial.println("Balancing Group 2");
+          this->cellsCurrentlyBalancing = (this->cellsInNeedOfBalancing & cellGroup2);
+          balancingMask = (this->cellsInNeedOfBalancing & cellGroup2);
         }
       }
+      skipPastGroup2Check:
+      Serial.println(cellsCurrentlyBalancing);
     }
     else
     {
+      Serial.println("No Cells in need of balancing");
       balancingMask = 0;
     }
   }

@@ -109,9 +109,18 @@ void loop()
 {
   digitalWrite(WATCHDOG,LOW);
   digitalWrite(WATCHDOG,HIGH);
+
   if(readVFlag!=1)
   {
+    digitalWrite(status, LOW);
+    balanceByte = 0x00;
+    balanceFunction(); //Turn off balancing before voltage read
+    delay(100); //Take a moment for cell voltages to stabilize
     readV();
+    balanceByte = storeByte;
+    if(balanceByte>0)
+      digitalWrite(status, HIGH);
+    balanceFunction();
     //delay(300);
     //readV();
     readVFlag = 0;
@@ -120,7 +129,7 @@ void loop()
   //readT(); //REVIEW: Remove after debug
   Serial.print("Cell 6 V: ");
   Serial.println((((volt[7] & 0xF0) >> 8 | (volt[8] & 0xFF) << 4)));
-  delay(100);
+  //delay(100);
 }
 
 void writeReg() //Writes configuration settings
@@ -255,15 +264,21 @@ void requestEvent()
 
     digitalWrite(status, LOW);
 
-    balanceByte = 0x00;
-    balanceFunction(); //Turn off balancing before voltage read
-    //delay(20); //Take a moment for cell voltages to stabilize
     //digitalWrite(status,HIGH);
     readT();
     //readV();
-    //readVFlag = 1;
+    /*
+    digitalWrite(status, LOW);
+    balanceByte = 0x00;
+    balanceFunction(); //Turn off balancing before voltage read
+    delay(100); //Take a moment for cell voltages to stabilize
+    readV();
     balanceByte = storeByte;
-    balanceFunction();
+    if(balanceByte>0)
+      digitalWrite(status, HIGH);
+    balanceFunction();*/
+    //readVFlag = 1;
+
     printV(volt);
     readVFlag = 0;
 }
